@@ -50,8 +50,9 @@ struct mast_dta
 {
 	int gdt;    /* data wire gpio */
 	int od;     /* data wire gpio is an open drain type of output */
+	int bpu;    /* enable data wire bit-banged pull-up */
 	int gpu;    /* pull-up gpio (-1: not configured) */
-	int epu;    /* enable data wire pull-up */
+	int rev;    /* reverse logic for pull-up gpio */
 
 	struct w1_bus_master *master;
 	int delay;  /* requested pull-up delay */
@@ -94,9 +95,9 @@ static u8 w1_set_pullup(void *data, int delay)
 		mdt->delay = delay;
 	} else {
 		if (mdt->delay) {
-			gpio_set_value(mdt->gpu, 1);
+			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
 			msleep(mdt->delay);
-			gpio_set_value(mdt->gpu, 0);
+			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
 		}
 		mdt->delay = 0;
 	}
@@ -154,18 +155,20 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 	struct {
 		unsigned gdt :1;
 		unsigned od  :1;
+		unsigned bpu :1;
 		unsigned gpu :1;
-		unsigned epu :1;
+		unsigned rev :1;
 		unsigned val :1;
 	} exts = {0};
 
 	/* set defaults */
 	mdt->gdt = mdt->gpu = -1;
-	mdt->od = mdt->epu = 0;
+	mdt->od = mdt->bpu = 0;
 
 	for (ltkn = get_tkn(&arg, &tkn);
 		ltkn;
-		exts.gdt = exts.od = exts.gpu = exts.epu = exts.val = 0)
+		exts.gdt = exts.od = exts.bpu =
+			exts.gpu = exts.rev =exts.val = 0)
 	{
 		/* param name */
 		if (!strncmp(tkn, "gdt", ltkn)) {
@@ -174,11 +177,14 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 		if (!strncmp(tkn, "od", ltkn)) {
 			exts.od = 1;
 		} else
+		if (!strncmp(tkn, "bpu", ltkn)) {
+			exts.bpu = 1;
+		} else
 		if (!strncmp(tkn, "gpu", ltkn)) {
 			exts.gpu = 1;
 		} else
-		if (!strncmp(tkn, "epu", ltkn)) {
-			exts.epu = 1;
+		if (!strncmp(tkn, "rev", ltkn)) {
+			exts.rev = 1;
 		} else {
 			/* unknown param */
 			return -EINVAL;
@@ -222,6 +228,7 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 				return -EINVAL;
 			}
 		} else {
+			/* od, bpu, rev */
 			if (exts.val)
 			{
 				/* bool */
@@ -245,8 +252,10 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 
 			if (exts.od)
 				mdt->od = val;
+			else if (exts.bpu)
+				mdt->bpu = val;
 			else
-				mdt->epu = val;
+				mdt->rev = val;
 		}
 
 		/* get the next token (if required) */
@@ -302,20 +311,20 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.od && (mdt.gpu < 0 && mdt.epu)) {
+		if (mdt.od && (mdt.gpu < 0 && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
-				"Can't enable data wire pull-up for "
-				"open-drain gpio; m%d <%s>\n", i+1, marg);
+				"Can't enable data wire but-banged pull-up for"
+				" open-drain gpio; m%d <%s>\n", i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
 		}
 
-		if (!mdt.od && (mdt.gpu >=0 && mdt.epu)) {
+		if (!mdt.od && (mdt.gpu >=0 && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
 				"Be specific if pull-up should be enabled via"
-				" the data wire or an external gpio; m%d <%s>",
-				i+1, marg);
+				" bit-banging the data wire or an external "
+				"gpio; m%d <%s>", i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -333,7 +342,10 @@ int init_module(void)
 
 		if (mdt.gpu >= 0 &&
 			(ret = gpio_request_one(mdt.gpu,
-				GPIOF_OUT_INIT_LOW, MODULE_NAME)) != 0)
+				(mdt.rev ?
+					 GPIOF_OUT_INIT_HIGH :
+					 GPIOF_OUT_INIT_LOW),
+				MODULE_NAME)) != 0)
 		{
 			printk(KERN_ERR LOG_PREF
 				"%d gpio request error: %d; m%d <%s>",
@@ -357,7 +369,7 @@ int init_module(void)
 
 		if (mdt.gpu)
 			mdt.master->set_pullup = w1_set_pullup;
-		else if (mdt.epu)
+		else if (mdt.bpu)
 			mdt.master->bitbang_pullup = w1_bitbang_pullup;
 
 		if ((ret = w1_add_master_device(mdt.master)) != 0) {
