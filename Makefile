@@ -1,17 +1,20 @@
 # max number of supported masters
 CONFIG_W1_MAST_MAX=5
 
+KERN_BLD_DIR=$(shell if test "${KERNEL_SRC}x" = "x"; then echo "/lib/modules/`uname -r`/build"; else echo "${KERNEL_SRC}"; fi;)
+KERN_SRC_DIR=$(shell if test "${KERNEL_SRC}x" = "x"; then echo "/lib/modules/`uname -r`/source"; else echo "${KERNEL_SRC}"; fi;)
+
 .PHONY: all clean gen-mast w1-headers ctags
 
 obj-m = w1-gpio-cl.o
 ccflags-y = -DCONFIG_W1_MAST_MAX=${CONFIG_W1_MAST_MAX}
 
 all: gen-mast w1-headers
-	$(MAKE) -C /lib/modules/`uname -r`/build M=$(PWD) modules
+	$(MAKE) -C ${KERN_BLD_DIR} M=$(PWD) modules
 
 clean:
 	rm -f gen-mast.h
-	$(MAKE) -C /lib/modules/`uname -r`/build M=$(PWD) clean
+	$(MAKE) -C ${KERN_BLD_DIR} M=$(PWD) clean
 
 gen-mast:
 	@for i in `seq 1 ${CONFIG_W1_MAST_MAX}`; \
@@ -39,8 +42,8 @@ gen-mast:
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
-	  if [ -d /lib/modules/`uname -r`/drivers/w1 ]; then \
-	    ln -s /lib/modules/`uname -r`/drivers/w1 w1; \
+	  if [ -d ${KERN_SRC_DIR}/drivers/w1 ]; then \
+	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
 	  else \
 	    ln -s w1-internal w1; \
 	    echo "\nNOTE: The compiled module needs w1 set of headers, which is part of the internal"; \
@@ -57,10 +60,10 @@ w1-headers:
 
 ctags:
 	@if [ ! -L kernel-source ]; then \
-	  ln -s /lib/modules/`uname -r`/source kernel-source; \
+	  ln -s ${KERN_SRC_DIR} kernel-source; \
 	fi; \
 	if [ ! -L kernel-build ]; then \
-	  ln -s /lib/modules/`uname -r`/build kernel-build; \
+	  ln -s ${KERN_BLD_DIR} kernel-build; \
 	fi; \
 	echo "Generating C tags..."; \
 	ctags -R --c-kinds=+px --c++-kinds=+px .;
