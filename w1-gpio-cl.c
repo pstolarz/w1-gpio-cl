@@ -95,9 +95,9 @@ static u8 w1_set_pullup(void *data, int delay)
 		mdt->delay = delay;
 	} else {
 		if (mdt->delay) {
-			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
-			msleep(mdt->delay);
 			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
+			msleep(mdt->delay);
+			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
 		}
 		mdt->delay = 0;
 	}
@@ -343,8 +343,8 @@ int init_module(void)
 		if (mdt.gpu >= 0 &&
 			(ret = gpio_request_one(mdt.gpu,
 				(mdt.rev ?
-					 GPIOF_OUT_INIT_HIGH :
-					 GPIOF_OUT_INIT_LOW),
+					 GPIOF_OUT_INIT_LOW :
+					 GPIOF_OUT_INIT_HIGH),
 				MODULE_NAME)) != 0)
 		{
 			printk(KERN_ERR LOG_PREF
