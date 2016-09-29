@@ -297,7 +297,8 @@ int init_module(void)
 
 		if (mdt.gdt < 0 || !gpio_is_valid(mdt.gdt)) {
 			printk(KERN_ERR LOG_PREF
-				"Invalid 'gdt' gpio; m%d <%s>\n", i+1, marg);
+				"Invalid or not provided 'gdt' gpio;"
+				" m%d <%s>\n", i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -367,7 +368,7 @@ int init_module(void)
 		mdt.master->read_bit = w1_read_bit;
 		mdt.master->write_bit = w1_write_bit;
 
-		if (mdt.gpu)
+		if (mdt.gpu >= 0)
 			mdt.master->set_pullup = w1_set_pullup;
 		else if (mdt.bpu)
 			mdt.master->bitbang_pullup = w1_bitbang_pullup;
