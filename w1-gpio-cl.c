@@ -24,7 +24,6 @@
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/gpio.h>
-#include <linux/delay.h>
 
 #if !defined(CONFIG_GPIOLIB) || !CONFIG_GPIOLIB
 # error Kernel need to be configured with GPIOLIB support
@@ -49,13 +48,13 @@
 struct mast_dta
 {
 	int gdt;    /* data wire gpio */
-	int od;     /* data wire gpio is an open drain type of output */
-	int bpu;    /* enable data wire bit-banged pull-up */
-	int gpu;    /* pull-up gpio (-1: not configured) */
-	int rev;    /* reverse logic for pull-up gpio */
+	int od;     /* data wire gpio is an open drain type of output (bool) */
+	int bpu;    /* strong pull-up via data wire bit-banging (bool) */
+	int gpu;    /* strong pull-up controlling gpio (-1: not configured) */
+	int rev;    /* reverse logic for 'gpu' gpio (bool) */
 
+	/* bus master handle */
 	struct w1_bus_master *master;
-	int delay;  /* requested pull-up delay */
 };
 
 static int n_mast;
@@ -85,30 +84,9 @@ static void w1_write_bit(void *data, u8 bit)
 }
 
 /*
- * W1 bus set pull-up callback.
+ * W1 bus strong pull-up bit-banging callback: data wire bit-banging.
  */
-static u8 w1_set_pullup(void *data, int delay)
-{
-	struct mast_dta *mdt = (struct mast_dta*)data;
-
-	if (delay) {
-		mdt->delay = delay;
-	} else {
-		if (mdt->delay) {
-			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
-			msleep(mdt->delay);
-			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
-		}
-		mdt->delay = 0;
-	}
-
-	return 0;
-}
-
-/*
- * W1 bus set bit-banged pull-up callback.
- */
-static void w1_bitbang_pullup(void *data, u8 on)
+static void w1_bitbang_pullup_bpu(void *data, u8 on)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
@@ -116,6 +94,19 @@ static void w1_bitbang_pullup(void *data, u8 on)
 		gpio_direction_output(mdt->gdt, 1);
 	else
 		gpio_direction_input(mdt->gdt);
+}
+
+/*
+ * W1 bus strong pull-up bit-banging callback: controlling via 'gpu' gpio.
+ */
+static void w1_bitbang_pullup_gpu(void *data, u8 on)
+{
+	struct mast_dta *mdt = (struct mast_dta*)data;
+
+	if (on)
+		gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
+	else
+		gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
 }
 
 /*
@@ -283,7 +274,6 @@ int init_module(void)
 	const char *marg;
 
 	n_mast = 0;
-	mdt.delay = 0;
 
 	for (i=0; i<CONFIG_W1_MAST_MAX; i++) {
 		if (!(marg = get_mast_arg(i))) continue;
@@ -314,8 +304,9 @@ int init_module(void)
 
 		if (mdt.od && (mdt.gpu < 0 && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
-				"Can't enable data wire but-banged pull-up for"
-				" open-drain gpio; m%d <%s>\n", i+1, marg);
+				"Can't enable data wire strong pull-up "
+				"bit-banging for open-drain gpio; m%d <%s>\n",
+				i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -323,9 +314,9 @@ int init_module(void)
 
 		if (!mdt.od && (mdt.gpu >=0 && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
-				"Be specific if pull-up should be enabled via"
-				" bit-banging the data wire or an external "
-				"gpio; m%d <%s>", i+1, marg);
+				"Be specific if strong pull-up should be "
+				"enabled via the data wire bit-banging or an "
+				"external gpio; m%d <%s>", i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -369,9 +360,9 @@ int init_module(void)
 		mdt.master->write_bit = w1_write_bit;
 
 		if (mdt.gpu >= 0)
-			mdt.master->set_pullup = w1_set_pullup;
+			mdt.master->bitbang_pullup = w1_bitbang_pullup_gpu;
 		else if (mdt.bpu)
-			mdt.master->bitbang_pullup = w1_bitbang_pullup;
+			mdt.master->bitbang_pullup = w1_bitbang_pullup_bpu;
 
 		if ((ret = w1_add_master_device(mdt.master)) != 0) {
 			kfree(mdt.master);
