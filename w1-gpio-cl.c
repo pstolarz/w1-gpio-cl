@@ -44,69 +44,89 @@
 #define MODULE_NAME  "w1-gpio-cl"
 #define LOG_PREF     MODULE_NAME ": "
 
+/* negative means not valid (not set, freed) */
+#define GPIO_VALID(g) ((g) >= 0)
 
 struct mast_dta
 {
+	/* config spec. */
 	int gdt;    /* data wire gpio */
 	int od;     /* data wire gpio is an open drain type of output (bool) */
 	int bpu;    /* strong pull-up via data wire bit-banging (bool) */
-	int gpu;    /* strong pull-up controlling gpio (-1: not configured) */
+	int gpu;    /* strong pull-up controlling gpio */
 	int rev;    /* reverse logic for 'gpu' gpio (bool) */
 
-	/* bus master handle */
-	struct w1_bus_master *master;
+	/* w1 bus master handle */
+	struct w1_bus_master master;
+	int add;   /* successfully added to the main driver (bool) */
 };
 
 static int n_mast;
 static struct mast_dta mast_dtas[CONFIG_W1_MAST_MAX];
 
 /*
- * W1 bus master bit read callback.
+ * NOTE: In all the callbacks handlers below there is a need to check gpio
+ * validity before its use, since the gpio may be in the "already-freed"
+ * state due to module's clean-up (unloading) process.
+ */
+
+/*
+ * w1 bus master bit read callback.
  */
 static u8 w1_read_bit(void *data)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	return (gpio_get_value(mdt->gdt) ? 1 : 0);
+	if (GPIO_VALID(mdt->gdt))
+		return (gpio_get_value(mdt->gdt) ? 1 : 0);
+	else
+		/* "normal state" of an open-drain medium is high */
+		return 1;
 }
 
 /*
- * W1 bus master bit write callback.
+ * w1 bus master bit write callback.
  */
 static void w1_write_bit(void *data, u8 bit)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (bit)
-		gpio_direction_input(mdt->gdt);
-	else
-		gpio_direction_output(mdt->gdt, 0);
+	if (GPIO_VALID(mdt->gdt)) {
+		if (bit)
+			gpio_direction_input(mdt->gdt);
+		else
+			gpio_direction_output(mdt->gdt, 0);
+	}
 }
 
 /*
- * W1 bus strong pull-up bit-banging callback: data wire bit-banging.
+ * w1 bus strong pull-up bit-banging callback: data wire bit-banging.
  */
 static void w1_bitbang_pullup_bpu(void *data, u8 on)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (on)
-		gpio_direction_output(mdt->gdt, 1);
-	else
-		gpio_direction_input(mdt->gdt);
+	if (GPIO_VALID(mdt->gdt)) {
+		if (on)
+			gpio_direction_output(mdt->gdt, 1);
+		else
+			gpio_direction_input(mdt->gdt);
+	}
 }
 
 /*
- * W1 bus strong pull-up bit-banging callback: controlling via 'gpu' gpio.
+ * w1 bus strong pull-up bit-banging callback: controlling via 'gpu' gpio.
  */
 static void w1_bitbang_pullup_gpu(void *data, u8 on)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (on)
-		gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
-	else
-		gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
+	if (GPIO_VALID(mdt->gpu)) {
+		if (on)
+			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
+		else
+			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
+	}
 }
 
 /*
@@ -133,7 +153,7 @@ static size_t get_tkn(const char **p_str, const char **p_tkn)
 }
 
 /*
- * Parse w1 master conf argument and write a result under mast_dta struct.
+ * Parse w1 bus master conf argument and write a result under mast_dta struct.
  * If success 0 is returned. In case some parameter is absent in the conf,
  * default value is assumed.
  */
@@ -143,6 +163,7 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 	const char *tkn;
 	size_t ltkn;
 
+	/* "exist" flags */
 	struct {
 		unsigned gdt :1;
 		unsigned od  :1;
@@ -153,8 +174,8 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 	} exts = {0};
 
 	/* set defaults */
-	mdt->gdt = mdt->gpu = -1;
-	mdt->od = mdt->bpu = 0;
+	mdt->gdt = mdt->gpu = -1;  /* not valid */
+	mdt->od = mdt->bpu = mdt->rev = 0;
 
 	for (ltkn = get_tkn(&arg, &tkn);
 		ltkn;
@@ -265,15 +286,46 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 }
 
 /*
+ * Module clean-up.
+ */
+void cleanup_module(void)
+{
+	int i;
+
+	for (i=0; i < n_mast; i++) {
+		if (GPIO_VALID(mast_dtas[i].gdt)) {
+			gpio_free(mast_dtas[i].gdt);
+			mast_dtas[i].gdt = -1;
+		}
+		if (GPIO_VALID(mast_dtas[i].gpu)) {
+			gpio_free(mast_dtas[i].gpu);
+			mast_dtas[i].gpu = -1;
+		}
+		if (mast_dtas[i].add) {
+			w1_remove_master_device(&mast_dtas[i].master);
+			mast_dtas[i].add = 0;
+		}
+	}
+
+	n_mast = 0;
+}
+
+/*
  * Module initialization.
  */
 int init_module(void)
 {
-	int i, ret=0;
+	int i, ret=0, res;
 	struct mast_dta mdt;
 	const char *marg;
 
 	n_mast = 0;
+
+	memset(&mdt.master, 0, sizeof(mdt.master));
+	mdt.add = 0;
+
+	mdt.master.read_bit = w1_read_bit;
+	mdt.master.write_bit = w1_write_bit;
 
 	for (i=0; i<CONFIG_W1_MAST_MAX; i++) {
 		if (!(marg = get_mast_arg(i))) continue;
@@ -285,7 +337,7 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.gdt < 0 || !gpio_is_valid(mdt.gdt)) {
+		if (!GPIO_VALID(mdt.gdt) || !gpio_is_valid(mdt.gdt)) {
 			printk(KERN_ERR LOG_PREF
 				"Invalid or not provided 'gdt' gpio;"
 				" m%d <%s>\n", i+1, marg);
@@ -294,7 +346,7 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.gpu >= 0 && !gpio_is_valid(mdt.gpu)) {
+		if (GPIO_VALID(mdt.gpu) && !gpio_is_valid(mdt.gpu)) {
 			printk(KERN_ERR LOG_PREF
 				"Invalid 'gpu' gpio; m%d <%s>\n", i+1, marg);
 
@@ -302,17 +354,17 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.od && (mdt.gpu < 0 && mdt.bpu)) {
+		if (mdt.od && (!GPIO_VALID(mdt.gpu) && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
 				"Can't enable data wire strong pull-up "
-				"bit-banging for open-drain gpio; m%d <%s>\n",
-				i+1, marg);
+				"bit-banging for an open-drain gpio; "
+				"m%d <%s>\n", i+1, marg);
 
 			ret = -EINVAL;
 			goto finish;
 		}
 
-		if (!mdt.od && (mdt.gpu >=0 && mdt.bpu)) {
+		if (!mdt.od && (GPIO_VALID(mdt.gpu) && mdt.bpu)) {
 			printk(KERN_ERR LOG_PREF
 				"Be specific if strong pull-up should be "
 				"enabled via the data wire bit-banging or an "
@@ -332,7 +384,7 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.gpu >= 0 &&
+		if (GPIO_VALID(mdt.gpu) &&
 			(ret = gpio_request_one(mdt.gpu,
 				(mdt.rev ?
 					 GPIOF_OUT_INIT_LOW :
@@ -345,63 +397,44 @@ int init_module(void)
 			goto finish;
 		}
 
-		mdt.master = (struct w1_bus_master*)kzalloc(
-			sizeof(struct w1_bus_master), GFP_KERNEL);
-		mast_dtas[n_mast++] = mdt;
+		mdt.master.data = &mast_dtas[n_mast];
 
-		if (!mdt.master) {
-			printk(KERN_CRIT LOG_PREF "No memory");
-			ret = -ENOMEM;
-			goto finish;
-		}
-
-		mdt.master->data = &mast_dtas[n_mast-1];
-		mdt.master->read_bit = w1_read_bit;
-		mdt.master->write_bit = w1_write_bit;
-
-		if (mdt.gpu >= 0)
-			mdt.master->bitbang_pullup = w1_bitbang_pullup_gpu;
+		if (GPIO_VALID(mdt.gpu))
+			mdt.master.bitbang_pullup = w1_bitbang_pullup_gpu;
 		else if (mdt.bpu)
-			mdt.master->bitbang_pullup = w1_bitbang_pullup_bpu;
+			mdt.master.bitbang_pullup = w1_bitbang_pullup_bpu;
 
-		if ((ret = w1_add_master_device(mdt.master)) != 0) {
-			kfree(mdt.master);
-			mast_dtas[n_mast-1].master = NULL;
-
-			printk(KERN_ERR LOG_PREF
-				"w1_add_master_device error: %d", ret);
-			goto finish;
-		}
+		mast_dtas[n_mast++] = mdt;
 	}
 
 	if (!n_mast) {
 		printk(KERN_ERR LOG_PREF
-			"No w1 master(s) specification. Exiting...");
+			"No w1 bus master(s) specification. Exiting...");
 
 		ret = -EINVAL;
 		goto finish;
 	}
 
+	/*
+	 * NOTE: There were observed deadlocks on the main driver ref-counters
+	 * during bus masters removal due to unsuccessful module initialization
+	 * (probably an issue with bus masters kernel threads start-ups). For
+	 * this reason the bus masters registration process doesn't lead to
+	 * the module initialization failure, and any problems at this stage
+	 * are only printk'ed.
+	 * On the other hand, failure here is rather uncommon.
+	 */
+	for (i=0; i < n_mast; i++) {
+		if ((res = w1_add_master_device(&mast_dtas[i].master)) != 0) {
+			printk(KERN_ERR LOG_PREF
+				"w1_add_master_device error: %d", res);
+		} else
+			mast_dtas[i].add = 1;
+	}
+
 finish:
 	if (ret) cleanup_module();
 	return ret;
-}
-
-/*
- * Module clean-up.
- */
-void cleanup_module(void)
-{
-	int i;
-
-	for (i=0; i < n_mast; i++) {
-		if (mast_dtas[i].gdt >= 0) gpio_free(mast_dtas[i].gdt);
-		if (mast_dtas[i].gpu >= 0) gpio_free(mast_dtas[i].gpu);
-		if (mast_dtas[i].master) {
-			w1_remove_master_device(mast_dtas[i].master);
-			kfree(mast_dtas[i].master);
-		}
-	}
 }
 
 MODULE_VERSION("1.0");
