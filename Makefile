@@ -1,5 +1,5 @@
 # max number of supported w1 bus masters
-CONFIG_W1_MAST_MAX=5
+CONFIG_W1_MAST_MAX ?= 5
 
 KERN_BLD_DIR:=$(shell if [ "${KERNEL_SRC}x" = "x" ]; then echo "/lib/modules/`uname -r`/build"; else echo "${KERNEL_SRC}"; fi;)
 KERN_SRC_DIR:=$(shell if [ "${KERNEL_SRC}x" = "x" ]; then echo "/lib/modules/`uname -r`/source"; else echo "${KERNEL_SRC}"; fi;)
