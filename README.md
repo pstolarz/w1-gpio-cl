@@ -106,7 +106,7 @@ The result is `w1-gpio-cl.ko` driver module located in the project directory.
 
 **Loading**
 
-`w1-gpio-cl` module depends on the `wire` Linux module, therefore must it be
+`w1-gpio-cl` module depends on the `wire` Linux module, therefore it must be
 loaded at first. To load the compiled module submit from the project directory:
 
     modprobe wire

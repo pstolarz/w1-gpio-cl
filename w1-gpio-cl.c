@@ -75,7 +75,7 @@ static struct mast_dta mast_dtas[CONFIG_W1_MAST_MAX];
  */
 static u8 w1_read_bit(void *data)
 {
-	struct mast_dta *mdt = (struct mast_dta*)data;
+	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
 	if (GPIO_VALID(mdt->gdt))
 		return (gpio_get_value(mdt->gdt) ? 1 : 0);
@@ -89,7 +89,7 @@ static u8 w1_read_bit(void *data)
  */
 static void w1_write_bit(void *data, u8 bit)
 {
-	struct mast_dta *mdt = (struct mast_dta*)data;
+	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
 	if (GPIO_VALID(mdt->gdt)) {
 		if (bit)
@@ -104,7 +104,7 @@ static void w1_write_bit(void *data, u8 bit)
  */
 static void w1_bitbang_pullup_bpu(void *data, u8 on)
 {
-	struct mast_dta *mdt = (struct mast_dta*)data;
+	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
 	if (GPIO_VALID(mdt->gdt)) {
 		if (on)
@@ -119,7 +119,7 @@ static void w1_bitbang_pullup_bpu(void *data, u8 on)
  */
 static void w1_bitbang_pullup_gpu(void *data, u8 on)
 {
-	struct mast_dta *mdt = (struct mast_dta*)data;
+	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
 	if (GPIO_VALID(mdt->gpu)) {
 		if (on)
@@ -290,16 +290,18 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
  */
 void cleanup_module(void)
 {
-	int i;
+	int i, gpio;
 
 	for (i=0; i < n_mast; i++) {
 		if (GPIO_VALID(mast_dtas[i].gdt)) {
-			gpio_free(mast_dtas[i].gdt);
+			gpio = mast_dtas[i].gdt;
 			mast_dtas[i].gdt = -1;
+			gpio_free(gpio);
 		}
 		if (GPIO_VALID(mast_dtas[i].gpu)) {
-			gpio_free(mast_dtas[i].gpu);
+			gpio = mast_dtas[i].gpu;
 			mast_dtas[i].gpu = -1;
+			gpio_free(gpio);
 		}
 		if (mast_dtas[i].add) {
 			w1_remove_master_device(&mast_dtas[i].master);
