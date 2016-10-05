@@ -52,7 +52,11 @@ Each of bus master configurations consist of set of parameters listed below:
   may be connected to a P-channel MOSFET gate controlling the `Vcc` strong
   pull-up as presented on the following figure.
 
-![External GPIO strong pull-up](schema/gpu.png)
+  ![External GPIO strong pull-up](schema/gpu.png)
+
+  NOTE: In place of the MOSFET there is possible to use a PNP bipolar transistor
+  with its emitter connected to the data wire, collector to `Vcc` and base to
+  the controlling GPIO (`gpu`).
 
 * `rev` - if specified and the `gpu` parameter is provided, the `gpu` GPIO
   logic is reversed for the strong pull-up activation: GPIO in the high state

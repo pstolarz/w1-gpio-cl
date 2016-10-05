@@ -34,7 +34,7 @@
 # error Kernel need to be configured with W1 support
 #endif
 
-#if CONFIG_W1_MAST_MAX <= 0
+#if !defined(CONFIG_W1_MAST_MAX) || CONFIG_W1_MAST_MAX <= 0
 # error Incorrect or undefined CONFIG_W1_MAST_MAX
 #endif
 
