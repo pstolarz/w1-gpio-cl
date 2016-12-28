@@ -85,28 +85,53 @@ Compilation and loading
 **Prerequisites**
 
 * Standard Linux kernel building toolset: `gcc`, GNU Make, `bc` etc.
+  For Debian family systems required packages may be installed by:
+
+      sudo apt-get install build-essential bc
 
 * Kernel headers and `kbuild` scripts corresponding to the target kernel.
 
+  Provided you are compiling the module for the host machine the required
+  headers may be installed by (Debian family OSes):
+
+      sudo apt-get install linux-headers-KERNEL_RELEASE-all
+
+  where *KERNEL_RELEASE* specifies kernel release version of the host machine
+  (`uname -r`).
+
   There is also possible to indicate a target kernel source tree by setting
-  `KERNEL_SRC` for the project `Makefile`. This is especially useful for the
-  module cross-compilation, in which case there is also a need to set `ARCH`
-  and `CROSS_COMPILE` to their proper values.
+  `KERNEL_SRC` as the source tree directory for the project `Makefile` (see
+  below). The source tree need to be prepared via proper configuration and
+  `modules_prepare` as follows (launched from the kernel source tree directory):
 
-**Pre-build configuration**
+      make CONFIG_TARGET
+      make modules_prepare
 
-By default the module is compiled to support up to 5 bus masters. This may be
-changed by setting `CONFIG_W1_MAST_MAX` for the project `Makefile`. For example:
+  where *CONFIG_TARGET* is a specific configuration target (e.g. `menuconfig`,
+  `oldconfig` etc.)
 
-    CONFIG_W1_MAST_MAX=10 make
-
-will compile the driver with up to 10 bus masters support.
+  This approach is especially useful for the module cross-compilation, in which
+  case there is also a need to set `ARCH` and `CROSS_COMPILE` to their proper
+  values.
 
 **Compilation**
 
-    make
+General compilation command syntax is as follows (launched from the project
+directory):
+
+    [KERNEL_SRC=...] [ARCH=...] [CROSS_COMPILE=...] [CONFIG_W1_MAST_MAX=...] make
 
 The result is `w1-gpio-cl.ko` driver module located in the project directory.
+All compilation definitions (`KERNEL_SRC`, `ARCH`, ...) are optional, with the
+following meaning:
+
+* `KERNEL_SRC`: specifies kernel source tree directory (see above).
+
+* `ARCH`, `CROSS_COMPILE`: are used for module cross-compilation exactly as
+  for the Linux kernel.
+
+* `CONFIG_W1_MAST_MAX`: by default the module is compiled to support up to 5 bus
+  masters. This may be changed by setting this definition.
 
 **Loading**
 
@@ -114,9 +139,9 @@ The result is `w1-gpio-cl.ko` driver module located in the project directory.
 loaded at first. To load the compiled module submit from the project directory:
 
     modprobe wire
-    insmod ./w1-gpio-cl.ko <configuration>
+    insmod w1-gpio-cl.ko MODULE_CONFIG
 
-where the `configuration` part specifies 1-wire bus master(s) configuration as
+where the *MODULE_CONFIG* part specifies 1-wire bus master(s) configuration as
 described above.
 
 License
