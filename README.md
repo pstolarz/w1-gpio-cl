@@ -79,6 +79,8 @@ In this example, there have been configured three bus masters:
   for most of its time, and is scanned/searched much more often than other
   buses for presence of authorized iButtons existence.
 
+NOTE: GPIO1, GPIO2, GPIO3 are numbers specifying actual GPIO pins.
+
 Compilation and loading
 -----------------------
 
@@ -112,7 +114,8 @@ Compilation and loading
 
   This approach is especially useful for the module cross-compilation, in which
   case there is also a need to set `ARCH` and `CROSS_COMPILE` to their proper
-  values.
+  values. Good explanation of kernel cross-compilation (for Raspberry Pi boards)
+  is [here](https://www.raspberrypi.org/documentation/linux/kernel/building.md).
 
 **Compilation**
 
