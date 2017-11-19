@@ -12,14 +12,14 @@ exists.
 Module configuration
 --------------------
 
-`w1-gpio-cl` is fully configured via its command line arguments while loading
+`w1-gpio-cl` is fully configured via its command line parameters while loading
 the driver. The configuration allows to launch many 1-wire bus masters
 controlling different GPIO pins. For parasite powering support, there is
 possible to choose a type of the strong pull-up to be used.
 
 General configuration syntax is:
 
-    insmod w1-gpi-cl.ko m1="gdt=num[,od][,bpu|gpu=num[,rev]]" [m2="..." ...]
+    insmod w1-gpi-cl.ko m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
 
 where:
 
