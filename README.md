@@ -21,16 +21,17 @@ General configuration syntax is:
 
     insmod w1-gpi-cl.ko m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
 
-where:
+NOTE: `:` and `,` syntax tokens may be replaced by `=` and `;` respectively,
+so `m1="gdt:4,od"` is equivalent to `m1="gdt:4;od"`, `m1="gdt=4,od"` or
+`m1="gdt=4;od"`.
 
-* `m1`, `m2`, ... `mN` - configure up to N (where N=5 for the standard module
-  compilation) bus masters, each one controlling different 1-wire bus connected
-  to its GPIO pin (specified in `gdt`). At least one bus master specification
-  (that is `m1`) must be provided.
-
-  It's worth to note, the `X` index in `mX` parameter specifies an order in
-  which bus masters are registered in the 1-wire subsystem. The index doesn't
-  need to correspond to the bus master id assigned by the kernel.
+`m1`, `m2`, ... `mN` - configure up to N (where N=5 for the standard module
+compilation) bus masters, each one controlling different 1-wire bus connected
+to its GPIO pin (specified in `gdt`). At least one bus master specification
+(that is `m1`) must be provided. It's worth to note, the `X` index in `mX`
+parameter specifies an order in which bus masters are registered in the 1-wire
+subsystem. The index doesn't need to correspond to the bus master id assigned
+by the kernel.
 
 Each of bus master configurations consist of set of parameters listed below:
 
