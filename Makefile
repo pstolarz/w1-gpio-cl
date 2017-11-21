@@ -4,7 +4,7 @@ CONFIG_W1_MAST_MAX ?= 5
 KERN_BLD_DIR:=$(shell if [ "${KERNEL_SRC}x" = "x" ]; then echo "/lib/modules/`uname -r`/build"; else echo "${KERNEL_SRC}"; fi;)
 KERN_SRC_DIR:=$(shell if [ "${KERNEL_SRC}x" = "x" ]; then echo "/lib/modules/`uname -r`/source"; else echo "${KERNEL_SRC}"; fi;)
 
-.PHONY: all clean distclean gen-mast w1-headers tags
+.PHONY: all clean distclean gen-mast w1-headers install uninstall tags
 
 obj-m = w1-gpio-cl.o
 ccflags-y = -DCONFIG_W1_MAST_MAX=${CONFIG_W1_MAST_MAX}
@@ -67,6 +67,14 @@ w1-headers:
 	    fi; \
 	  fi; \
 	fi;
+
+install:
+	cp $(obj-m:.o=.ko) /lib/modules/`uname -r`/kernel/drivers/w1/masters/
+	depmod
+
+uninstall:
+	rm -f /lib/modules/`uname -r`/kernel/drivers/w1/masters/$(obj-m:.o=.ko)
+	depmod
 
 tags:
 	@if [ ! -L kernel-source ]; then \

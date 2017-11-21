@@ -19,7 +19,7 @@ possible to choose a type of the strong pull-up to be used.
 
 General configuration syntax is:
 
-    insmod w1-gpi-cl.ko m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
+    insmod|modprobe w1-gpi-cl[.ko] m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
 
 NOTE: `:` and `,` syntax tokens may be replaced by `=` and `;` respectively,
 so `m1="gdt:4,od"` is equivalent to `m1="gdt:4;od"`, `m1="gdt=4,od"` or
@@ -137,16 +137,35 @@ following meaning:
 * `CONFIG_W1_MAST_MAX`: by default the module is compiled to support up to 5 bus
   masters. This may be changed by setting this definition.
 
+**Installation**
+
+If the module was compiled on the destination machine there is possible to
+install it into the modules destination directory by:
+
+      sudo make install
+
+and uninstall by:
+
+      sudo make uninstall
+
 **Loading**
 
 `w1-gpio-cl` module depends on the `wire` Linux module, therefore it must be
 loaded at first. To load the compiled module submit from the project directory:
 
-    modprobe wire
-    insmod w1-gpio-cl.ko MODULE_CONFIG
+    sudo modprobe wire
+    sudo insmod ./w1-gpio-cl.ko MODULE_CONFIG
 
 where the *MODULE_CONFIG* part specifies 1-wire bus master(s) configuration as
 described above.
+
+NOTE: If the module has been already installed there is sufficient to load it by:
+
+    sudo modprobe w1-gpio-cl MODULE_CONFIG
+
+and the `wire` module will be automatically loaded by `modprobe`.
+
+If you need to load the module automatically update `/etc/modules` appropriately.
 
 License
 -------
