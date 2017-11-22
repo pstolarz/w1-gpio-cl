@@ -19,7 +19,7 @@ possible to choose a type of the strong pull-up to be used.
 
 General configuration syntax is:
 
-    insmod|modprobe w1-gpi-cl[.ko] m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
+    modprobe w1-gpi-cl m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
 
 NOTE: `:` and `,` syntax tokens may be replaced by `=` and `;` respectively,
 so `m1="gdt:4,od"` is equivalent to `m1="gdt:4;od"`, `m1="gdt=4,od"` or
@@ -97,10 +97,7 @@ Compilation and loading
   Provided you are compiling the module for the host machine the required
   headers may be installed by (Debian family OSes):
 
-      sudo apt-get install linux-headers-KERNEL_RELEASE-all
-
-  where *KERNEL_RELEASE* specifies kernel release version of the host machine
-  (`uname -r`).
+      sudo apt-get install linux-headers-`uname -r`
 
   There is also possible to indicate a target kernel source tree by setting
   `KERNEL_SRC` as the source tree directory for the project `Makefile` (see
@@ -142,28 +139,22 @@ following meaning:
 If the module was compiled on the destination machine there is possible to
 install it into the modules destination directory by:
 
-      sudo make install
+    sudo make install
 
 and uninstall by:
 
-      sudo make uninstall
+    sudo make uninstall
+
+If the module was cross-compiled, copy `w1-gpio-cl.ko` module into its destination
+location on the target machine (`/lib/modules/KERNEL_RELEASE/kernel/drivers/w1/masters`)
+and remake the kernel modules dependencies by `depmod`.
 
 **Loading**
 
-`w1-gpio-cl` module depends on the `wire` Linux module, therefore it must be
-loaded at first. To load the compiled module submit from the project directory:
-
-    sudo modprobe wire
-    sudo insmod ./w1-gpio-cl.ko MODULE_CONFIG
+    sudo modprobe w1-gpio-cl MODULE_CONFIG
 
 where the *MODULE_CONFIG* part specifies 1-wire bus master(s) configuration as
 described above.
-
-NOTE: If the module has been already installed there is sufficient to load it by:
-
-    sudo modprobe w1-gpio-cl MODULE_CONFIG
-
-and the `wire` module will be automatically loaded by `modprobe`.
 
 If you need to load the module automatically update `/etc/modules` appropriately.
 

@@ -69,7 +69,7 @@ w1-headers:
 	fi;
 
 install:
-	cp $(obj-m:.o=.ko) /lib/modules/`uname -r`/kernel/drivers/w1/masters/
+	cp $(obj-m:.o=.ko) /lib/modules/`uname -r`/kernel/drivers/w1/masters
 	depmod
 
 uninstall:
