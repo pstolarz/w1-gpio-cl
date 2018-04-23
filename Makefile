@@ -24,7 +24,7 @@ gen-mast:
 	do \
 	  case $$i in \
 	  1) \
-	    echo "/* This file was generated.\n   Don't edit or changes will be lost.\n */\n" >$@.h; \
+	    echo -e "/* This file was generated.\n   Don't edit or changes will be lost.\n */\n" >$@.h; \
 	    pf="st";; \
 	  2) \
 	    pf="nd";; \
@@ -33,17 +33,17 @@ gen-mast:
 	  *) \
 	    pf="th";; \
 	  esac; \
-	  echo "static char *m$$i=NULL;" >>$@.h; \
-	  echo "module_param(m$$i, charp, 0444);" >>$@.h; \
-	  echo "MODULE_PARM_DESC(m$$i, \"$$i$$pf w1 bus master specification\");\n" >>$@.h; \
+	  echo -e "static char *m$$i=NULL;" >>$@.h; \
+	  echo -e "module_param(m$$i, charp, 0444);" >>$@.h; \
+	  echo -e "MODULE_PARM_DESC(m$$i, \"$$i$$pf w1 bus master specification\");\n" >>$@.h; \
 	done; \
-	echo "static const char *get_mast_arg(int i)\n{\n	switch (i+1)\n	{" >>$@.h; \
+	echo -e "static const char *get_mast_arg(int i)\n{\n	switch (i+1)\n	{" >>$@.h; \
 	for i in `seq 1 ${CONFIG_W1_MAST_MAX}`; \
 	do \
-	  echo "	case $$i: return m$$i;" >>$@.h; \
+	  echo -e "	case $$i: return m$$i;" >>$@.h; \
 	done; \
-	echo "	}\n	return NULL;\n}" >>$@.h; \
-	echo "\`$@.h' has been generated."
+	echo -e "	}\n	return NULL;\n}" >>$@.h; \
+	echo -e "\`$@.h' has been generated."
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
@@ -52,17 +52,17 @@ w1-headers:
 	  else \
 	    if [ "${KERNEL_SRC}x" = "x" ]; then \
 	      ln -s w1-internal w1; \
-	      echo "\nNOTE: The compiled module needs w1 set of headers, which is a part of the internal"; \
-	      echo "(not the public) part of the w1 API. The headers are contained in the full Linux"; \
-	      echo "kernel source tree."; \
-	      echo "Since the kernel sources has not been detected on this platform, the compilation"; \
-	      echo "process will use headers which are part of this source bundle (included in"; \
-	      echo "./w1-internal directory). Linux kernel API is not persistent across versions, so"; \
-	      echo "it is STRONGLY recommended to set ./w1 symbolic link to \`drivers/w1' subdirectory"; \
-	      echo "of the target kernel sources. This way proper w1 headers will be used.\n"; \
+	      echo -e "\nNOTE: The compiled module needs w1 set of headers, which is a part of the internal"; \
+	      echo -e "(not the public) part of the w1 API. The headers are contained in the full Linux"; \
+	      echo -e "kernel source tree."; \
+	      echo -e "Since the kernel sources has not been detected on this platform, the compilation"; \
+	      echo -e "process will use headers which are part of this source bundle (included in"; \
+	      echo -e "./w1-internal directory). Linux kernel API is not persistent across versions, so"; \
+	      echo -e "it is STRONGLY recommended to set ./w1 symbolic link to \`drivers/w1' subdirectory"; \
+	      echo -e "of the target kernel sources. This way proper w1 headers will be used.\n"; \
 	      read -p "Press ENTER to continue..." NULL; \
 	    else \
-	      echo "\nERROR: w1 sources not found in \`${KERNEL_SRC}'"; \
+	      echo -e "\nERROR: w1 sources not found in \`${KERNEL_SRC}'"; \
 	      exit 1; \
 	    fi; \
 	  fi; \

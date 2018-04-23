@@ -38,7 +38,7 @@
 # error Incorrect or undefined CONFIG_W1_MAST_MAX
 #endif
 
-#include "w1/w1_int.h"
+#include <linux/w1.h>
 #include "gen-mast.h"
 
 #define MODULE_NAME  "w1-gpio-cl"
