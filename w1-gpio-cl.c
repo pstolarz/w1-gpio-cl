@@ -38,7 +38,7 @@
 # error Incorrect or undefined CONFIG_W1_MAST_MAX
 #endif
 
-#include "w1/w1_int.h"
+/* Makefile auto-generated (CONFIG_W1_MAST_MAX dependant) */
 #include "gen-mast.h"
 
 #define MODULE_NAME  "w1-gpio-cl"

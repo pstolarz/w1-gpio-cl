@@ -9,7 +9,7 @@ KERN_SRC_DIR:=$(shell if [ "${KERNEL_SRC}x" = "x" ]; then echo "/lib/modules/`un
 obj-m = w1-gpio-cl.o
 ccflags-y = -DCONFIG_W1_MAST_MAX=${CONFIG_W1_MAST_MAX}
 
-all: gen-mast w1-headers
+all: gen-mast
 	$(MAKE) -C ${KERN_BLD_DIR} M=$(PWD) modules
 
 clean:
@@ -19,12 +19,21 @@ clean:
 distclean: clean
 	rm -f w1 kernel-source kernel-build tags
 
-gen-mast:
+gen-mast: w1-headers
 	@for i in `seq 1 ${CONFIG_W1_MAST_MAX}`; \
 	do \
 	  case $$i in \
 	  1) \
-	    echo "/* This file was generated.\n   Don't edit or changes will be lost.\n */\n" >$@.h; \
+	    echo "/*" >$@.h; \
+	    echo " * This file was auto-generated." >>$@.h; \
+	    echo " * Don't edit it or changes will be lost." >>$@.h; \
+	    echo " */" >>$@.h; \
+	    if [ -f w1/w1_int.h ]; then \
+	      echo "#include \"w1/w1_int.h\"" >>$@.h; \
+	    else \
+	      echo "#include \"w1/w1.h\"" >>$@.h; \
+	    fi; \
+	    echo >>$@.h; \
 	    pf="st";; \
 	  2) \
 	    pf="nd";; \
@@ -35,34 +44,44 @@ gen-mast:
 	  esac; \
 	  echo "static char *m$$i=NULL;" >>$@.h; \
 	  echo "module_param(m$$i, charp, 0444);" >>$@.h; \
-	  echo "MODULE_PARM_DESC(m$$i, \"$$i$$pf w1 bus master specification\");\n" >>$@.h; \
+	  echo "MODULE_PARM_DESC(m$$i, \"$$i$$pf w1 bus master specification\");" >>$@.h; \
+	  echo >>$@.h; \
 	done; \
-	echo "static const char *get_mast_arg(int i)\n{\n	switch (i+1)\n	{" >>$@.h; \
+	echo "static const char *get_mast_arg(int i)" >>$@.h; \
+	echo "{" >>$@.h; \
+	echo "	switch (i+1)" >>$@.h; \
+	echo "	{" >>$@.h; \
 	for i in `seq 1 ${CONFIG_W1_MAST_MAX}`; \
 	do \
 	  echo "	case $$i: return m$$i;" >>$@.h; \
 	done; \
-	echo "	}\n	return NULL;\n}" >>$@.h; \
-	echo "\`$@.h' has been generated."
+	echo "	}" >>$@.h; \
+	echo "	return NULL;" >>$@.h; \
+	echo "}" >>$@.h; \
+	echo "$@.h is generated."
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
-	  if [ -d ${KERN_SRC_DIR}/drivers/w1 ]; then \
+	  if [ -f ${KERN_SRC_DIR}/drivers/w1/w1_int.h ]; then \
 	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
+	    echo "w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
+	  elif [ -f ${KERN_SRC_DIR}/include/linux/w1.h ]; then \
+	    ln -s ${KERN_SRC_DIR}/include/linux w1; \
+	    echo "w1 -> ${KERN_SRC_DIR}/include/linux"; \
 	  else \
 	    if [ "${KERNEL_SRC}x" = "x" ]; then \
-	      ln -s w1-internal w1; \
-	      echo "\nNOTE: The compiled module needs w1 set of headers, which is a part of the internal"; \
-	      echo "(not the public) part of the w1 API. The headers are contained in the full Linux"; \
-	      echo "kernel source tree."; \
-	      echo "Since the kernel sources has not been detected on this platform, the compilation"; \
-	      echo "process will use headers which are part of this source bundle (included in"; \
-	      echo "./w1-internal directory). Linux kernel API is not persistent across versions, so"; \
-	      echo "it is STRONGLY recommended to set ./w1 symbolic link to \`drivers/w1' subdirectory"; \
-	      echo "of the target kernel sources. This way proper w1 headers will be used.\n"; \
+	      ln -s ./w1-internal w1; \
+	      echo "w1 -> ./w1-internal"; \
+	      echo; \
+	      echo "NOTE: The compiled module needs w1 set of headers, which have not been"; \
+	      echo "detected on this platform. The compilation process will use headers which"; \
+	      echo "are part of this source bundle (located in ./w1-internal directory)."; \
+	      echo "Linux kernel API is not persistent across versions, so it is STRONGLY"; \
+	      echo "recommended to set ./w1 symbolic link to a proper w1 header files directory"; \
+	      echo "of the target kernel sources."; \
 	      read -p "Press ENTER to continue..." NULL; \
 	    else \
-	      echo "\nERROR: w1 sources not found in \`${KERNEL_SRC}'"; \
+	      echo "ERROR: w1 sources not found in ${KERNEL_SRC}"; \
 	      exit 1; \
 	    fi; \
 	  fi; \
