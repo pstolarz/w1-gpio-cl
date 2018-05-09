@@ -34,6 +34,13 @@ gen-mast: w1-headers
 	      echo "#include \"w1/w1.h\"" >>$@.h; \
 	    fi; \
 	    echo >>$@.h; \
+	   if [ `grep -c bitbang_pullup w1/w1.h` -gt 0 ]; then \
+	     echo "NOTE: bitbang_pullup() supported as a pullup callback"; \
+	     echo "#ifndef CONFIG_W1_BITBANG_PULLUP" >>$@.h; \
+	     echo "# define CONFIG_W1_BITBANG_PULLUP 1" >>$@.h; \
+	     echo "#endif" >>$@.h; \
+	     echo >>$@.h; \
+	   fi; \
 	    pf="st";; \
 	  2) \
 	    pf="nd";; \
@@ -58,33 +65,29 @@ gen-mast: w1-headers
 	echo "	}" >>$@.h; \
 	echo "	return NULL;" >>$@.h; \
 	echo "}" >>$@.h; \
-	echo "$@.h is generated."
+	echo "NOTE: $@.h was generated"
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
 	  if [ -f ${KERN_SRC_DIR}/drivers/w1/w1_int.h ]; then \
 	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
-	    echo "w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
+	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
 	  elif [ -f ${KERN_SRC_DIR}/include/linux/w1.h ]; then \
 	    ln -s ${KERN_SRC_DIR}/include/linux w1; \
-	    echo "w1 -> ${KERN_SRC_DIR}/include/linux"; \
+	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/include/linux"; \
 	  else \
 	    if [ "${KERNEL_SRC}x" = "x" ]; then \
-	      ln -s ./w1-internal w1; \
-	      echo "w1 -> ./w1-internal"; \
-	      echo; \
-	      echo "NOTE: The compiled module needs w1 set of headers, which have not been"; \
-	      echo "detected on this platform. The compilation process will use headers which"; \
-	      echo "are part of this source bundle (located in ./w1-internal directory)."; \
-	      echo "Linux kernel API is not persistent across versions, so it is STRONGLY"; \
-	      echo "recommended to set ./w1 symbolic link to a proper w1 header files directory"; \
-	      echo "of the target kernel sources."; \
+	      ln -s w1-internal w1; \
+	      echo "NOTE: w1 -> w1-internal"; \
+	      echo "WARNING: The compiled module needs w1 set of headers, which have not been detected on this platform. The compilation process will use headers which are part of this source bundle (located in ./w1-internal directory). Linux kernel API is not persistent across versions, so it is STRONGLY recommended to set ./w1 symbolic link to a proper w1 header files directory of the target kernel sources."; \
 	      read -p "Press ENTER to continue..." NULL; \
 	    else \
 	      echo "ERROR: w1 sources not found in ${KERNEL_SRC}"; \
 	      exit 1; \
 	    fi; \
 	  fi; \
+	else \
+	  echo "NOTE: ./w1 symlink is already set and will not be updated. Remove it and restart the compilation process in case you want to re-run the kernel sources examination."; \
 	fi;
 
 install:
