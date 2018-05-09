@@ -65,7 +65,7 @@ gen-mast: w1-headers
 	echo "	}" >>$@.h; \
 	echo "	return NULL;" >>$@.h; \
 	echo "}" >>$@.h; \
-	echo "NOTE: $@.h was generated"
+	echo "NOTE: $@.h was generated";
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
@@ -79,7 +79,12 @@ w1-headers:
 	    if [ "${KERNEL_SRC}x" = "x" ]; then \
 	      ln -s w1-internal w1; \
 	      echo "NOTE: w1 -> w1-internal"; \
-	      echo "WARNING: The compiled module needs w1 set of headers, which have not been detected on this platform. The compilation process will use headers which are part of this source bundle (located in ./w1-internal directory). Linux kernel API is not persistent across versions, so it is STRONGLY recommended to set ./w1 symbolic link to a proper w1 header files directory of the target kernel sources."; \
+	      echo "WARNING: The compiled module needs w1 set of headers, \
+which have not been detected on this platform. The compilation process will \
+use headers which are part of this source bundle (located in ./w1-internal \
+directory). Linux kernel API is not persistent across versions, so it is \
+STRONGLY recommended to set ./w1 symbolic link to a proper w1 header files \
+directory of the target kernel sources."; \
 	      read -p "Press ENTER to continue..." NULL; \
 	    else \
 	      echo "ERROR: w1 sources not found in ${KERNEL_SRC}"; \
@@ -87,7 +92,9 @@ w1-headers:
 	    fi; \
 	  fi; \
 	else \
-	  echo "NOTE: ./w1 symlink is already set and will not be updated. Remove it and restart the compilation process in case you want to re-run the kernel sources examination."; \
+	  echo "NOTE: ./w1 symlink is already set and will not be updated. \
+Remove it and restart the compilation process in case you want to re-run the \
+kernel sources examination."; \
 	fi;
 
 install:
