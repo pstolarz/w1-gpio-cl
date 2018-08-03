@@ -2,7 +2,7 @@
  * w1-gpio-cl
  * Command line configured gpio w1 bus master driver
  *
- * Copyright (c) 2016 Piotr Stolarz <pstolarz@o2.pl>
+ * Copyright (c) 2016,2018 Piotr Stolarz <pstolarz@o2.pl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -58,7 +59,8 @@ struct mast_dta
 
 	/* w1 bus master handle */
 	struct w1_bus_master master;
-	int add;   /* successfully added to the main driver (bool) */
+	int add;    /* successfully added to the main driver (bool) */
+	int pudur;  /* pullup duration for set_pullup() callback */
 };
 
 static int n_mast;
@@ -100,13 +102,23 @@ static void w1_write_bit(void *data, u8 bit)
 }
 
 /*
- * w1 bus strong pull-up bit-banging callback: data wire bit-banging.
+ * w1 bus master bitbang_pullup() callback.
  */
-static void w1_bitbang_pullup_bpu(void *data, u8 on)
+static void w1_bitbang_pullup(void *data, u8 on)
 {
 	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (GPIO_VALID(mdt->gdt)) {
+	if (GPIO_VALID(mdt->gpu))
+	{
+		/* bit-banging controled via 'gpu' gpio */
+		if (on)
+			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
+		else
+			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
+	} else
+	if (mdt->bpu && GPIO_VALID(mdt->gdt))
+	{
+		/* data wire bit-banging */
 		if (on)
 			gpio_direction_output(mdt->gdt, 1);
 		else
@@ -114,20 +126,25 @@ static void w1_bitbang_pullup_bpu(void *data, u8 on)
 	}
 }
 
+#if !defined(CONFIG_W1_BITBANG_PULLUP) || !CONFIG_W1_BITBANG_PULLUP
 /*
- * w1 bus strong pull-up bit-banging callback: controlling via 'gpu' gpio.
+ * w1 bus master set_pullup() callback.
  */
-static void w1_bitbang_pullup_gpu(void *data, u8 on)
+static u8 w1_set_pullup(void *data, int pullup_duration)
 {
 	volatile struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (GPIO_VALID(mdt->gpu)) {
-		if (on)
-			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
-		else
-			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
+	if (pullup_duration)
+		mdt->pudur = pullup_duration;
+	else {
+		w1_bitbang_pullup(data, 1);
+		msleep(mdt->pudur);
+		w1_bitbang_pullup(data, 0);
+		mdt->pudur = 0;
 	}
+	return 0;
 }
+#endif
 
 /*
  * Get a token for parse_mast_conf().
@@ -325,6 +342,7 @@ int init_module(void)
 
 	memset(&mdt.master, 0, sizeof(mdt.master));
 	mdt.add = 0;
+	mdt.pudur = 0;
 
 	mdt.master.read_bit = w1_read_bit;
 	mdt.master.write_bit = w1_write_bit;
@@ -401,10 +419,14 @@ int init_module(void)
 
 		mdt.master.data = &mast_dtas[n_mast];
 
-		if (GPIO_VALID(mdt.gpu))
-			mdt.master.bitbang_pullup = w1_bitbang_pullup_gpu;
-		else if (mdt.bpu)
-			mdt.master.bitbang_pullup = w1_bitbang_pullup_bpu;
+		if (GPIO_VALID(mdt.gpu) || mdt.bpu)
+		{
+#if !defined(CONFIG_W1_BITBANG_PULLUP) || !CONFIG_W1_BITBANG_PULLUP
+			mdt.master.set_pullup = w1_set_pullup;
+#else
+			mdt.master.bitbang_pullup = w1_bitbang_pullup;
+#endif
+		}
 
 		mast_dtas[n_mast++] = mdt;
 	}
@@ -439,7 +461,7 @@ finish:
 	return ret;
 }
 
-MODULE_VERSION("1.0");
+MODULE_VERSION("1.1");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Command line configured gpio w1 bus master driver");
 MODULE_AUTHOR("Piotr Stolarz <pstolarz@o2.pl>");
