@@ -19,7 +19,7 @@ possible to choose a type of the strong pull-up to be used.
 
 General configuration syntax is:
 
-    modprobe w1-gpi-cl m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
+    modprobe w1-gpio-cl m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
 
 NOTE: `:` and `,` syntax tokens may be replaced by `=` and `;` respectively,
 so `m1="gdt:4,od"` is equivalent to `m1="gdt:4;od"`, `m1="gdt=4,od"` or
