@@ -107,8 +107,9 @@ Compilation and loading
       make CONFIG_TARGET
       make modules_prepare
 
-  where *CONFIG_TARGET* is a specific configuration target (e.g. `menuconfig`,
-  `oldconfig` etc.)
+  where *CONFIG_TARGET* is a specific configuration target (e.g. for Raspberry
+  Pi boards the configuration shall be set to `bcmrpi_defconfig`, `bcm2709_defconfig`
+  or `bcm2711_defconfig` depending on the platform version).
 
   This approach is especially useful for the module cross-compilation, in which
   case there is also a need to set `ARCH` and `CROSS_COMPILE` to their proper
