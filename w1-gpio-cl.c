@@ -2,7 +2,7 @@
  * w1-gpio-cl
  * Command line configured gpio w1 bus master driver
  *
- * Copyright (c) 2016,2018 Piotr Stolarz <pstolarz@o2.pl>
+ * Copyright (c) 2016,2018,2020 Piotr Stolarz <pstolarz@o2.pl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,8 +20,10 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/atomic.h>
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/gpio.h>
@@ -66,24 +68,82 @@ struct mast_dta
 static int n_mast;
 static struct mast_dta mast_dtas[CONFIG_W1_MAST_MAX];
 
+static atomic_t ref_cnt = ATOMIC_INIT(0);
+
 /*
- * NOTE: In all the callbacks handlers below there is a need to check gpio
- * validity before its use, since the gpio may be in the "already-freed"
- * state due to module's clean-up (unloading) process.
+ * Increase bus-active-ref-counter by one if not already in the cleanup state
+ * (the function returns 'false' while in this state). Resulted counter value
+ * is > 0 which forbids module cleanup process to start (function returns
+ * 'true' in this case and requires decreasing the counter by dec_ref_cnt()
+ * subsequently).
  */
+static bool inc_ref_cnt(void)
+{
+	int cnt = atomic_read(&ref_cnt);
+
+	do {
+		if (cnt < 0)
+			return false;
+
+		/* cnt >= 0 at this point */
+	} while (!atomic_try_cmpxchg_relaxed(&ref_cnt, &cnt, cnt + 1));
+
+	return true;
+}
+
+/*
+ * Decrease bus-active-ref-counter by one if not already in the cleanup state.
+ * If resulted counter value is 0 module cleanup process is allowed to start.
+ */
+static void dec_ref_cnt(void)
+{
+	int cnt = atomic_read(&ref_cnt);
+
+	do {
+		if (cnt < 0)
+			break;
+
+		/* cnt >= 0 at this point */
+	} while (!atomic_try_cmpxchg_relaxed(
+		&ref_cnt, &cnt, (cnt >= 1 ? cnt - 1 : 0)));
+}
+
+/*
+ * Starts module cleanup process. The routine blocks until the cleanup process
+ * is started.
+ */
+static void cleanup_start(void)
+{
+	int cnt;
+
+	do {
+		while ((cnt = atomic_read(&ref_cnt)) > 0) {
+			/* yield until finishing activities on the bus */
+			cond_resched();
+		}
+
+		if (cnt < 0)
+			break;
+
+		/* cnt == 0 at this point */
+	} while (!atomic_try_cmpxchg_relaxed(&ref_cnt, &cnt, -1));
+}
 
 /*
  * w1 bus master bit read callback.
  */
 static u8 w1_read_bit(void *data)
 {
-	volatile struct mast_dta *mdt = (struct mast_dta*)data;
+	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (GPIO_VALID(mdt->gdt))
-		return (gpio_get_value(mdt->gdt) ? 1 : 0);
-	else
-		/* "normal state" of an open-drain medium is high */
-		return 1;
+	/* "normal state" of an open-drain medium is high */
+	u8 ret = 1;
+
+	if (inc_ref_cnt()) {
+		ret = (gpio_get_value(mdt->gdt) ? 1 : 0);
+		dec_ref_cnt();
+	}
+	return ret;
 }
 
 /*
@@ -91,38 +151,41 @@ static u8 w1_read_bit(void *data)
  */
 static void w1_write_bit(void *data, u8 bit)
 {
-	volatile struct mast_dta *mdt = (struct mast_dta*)data;
+	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (GPIO_VALID(mdt->gdt)) {
-		if (bit)
+	if (inc_ref_cnt()) {
+		if (bit) {
 			gpio_direction_input(mdt->gdt);
-		else
+		} else {
 			gpio_direction_output(mdt->gdt, 0);
+		}
+		dec_ref_cnt();
 	}
 }
 
 /*
- * w1 bus master bitbang_pullup() callback.
+ * Same as w1_bitbang_pullup() but to be called in bus-active protected section.
  */
-static void w1_bitbang_pullup(void *data, u8 on)
+static void _w1_bitbang_pullup(void *data, u8 on)
 {
-	volatile struct mast_dta *mdt = (struct mast_dta*)data;
+	struct mast_dta *mdt = (struct mast_dta*)data;
 
 	if (GPIO_VALID(mdt->gpu))
 	{
-		/* bit-banging controled via 'gpu' gpio */
-		if (on)
+		/* bit-banging controlled via 'gpu' gpio */
+		if (on) {
 			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
-		else
+		} else {
 			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
+		}
 	} else
-	if (mdt->bpu && GPIO_VALID(mdt->gdt))
 	{
 		/* data wire bit-banging */
-		if (on)
+		if (on) {
 			gpio_direction_output(mdt->gdt, 1);
-		else
+		} else {
 			gpio_direction_input(mdt->gdt);
+		}
 	}
 }
 
@@ -132,17 +195,31 @@ static void w1_bitbang_pullup(void *data, u8 on)
  */
 static u8 w1_set_pullup(void *data, int pullup_duration)
 {
-	volatile struct mast_dta *mdt = (struct mast_dta*)data;
+	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (pullup_duration)
-		mdt->pudur = pullup_duration;
-	else {
-		w1_bitbang_pullup(data, 1);
-		msleep(mdt->pudur);
-		w1_bitbang_pullup(data, 0);
-		mdt->pudur = 0;
+	if (inc_ref_cnt()) {
+		if (pullup_duration) {
+			mdt->pudur = pullup_duration;
+		} else {
+			_w1_bitbang_pullup(data, 1);
+			msleep(mdt->pudur);
+			_w1_bitbang_pullup(data, 0);
+			mdt->pudur = 0;
+		}
+		dec_ref_cnt();
 	}
 	return 0;
+}
+#else
+/*
+ * w1 bus master bitbang_pullup() callback.
+ */
+static void w1_bitbang_pullup(void *data, u8 on)
+{
+	if (inc_ref_cnt()) {
+		_w1_bitbang_pullup(data, on);
+		dec_ref_cnt();
+	}
 }
 #endif
 
@@ -303,22 +380,23 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 }
 
 /*
- * Module clean-up.
+ * Module cleanup.
  */
 void cleanup_module(void)
 {
-	int i, gpio;
+	int i;
+
+	cleanup_start();
+	/* cleanup safely started (no more gpio access allowed hereafter) */
 
 	for (i=0; i < n_mast; i++) {
 		if (GPIO_VALID(mast_dtas[i].gdt)) {
-			gpio = mast_dtas[i].gdt;
+			gpio_free(mast_dtas[i].gdt);
 			mast_dtas[i].gdt = -1;
-			gpio_free(gpio);
 		}
 		if (GPIO_VALID(mast_dtas[i].gpu)) {
-			gpio = mast_dtas[i].gpu;
+			gpio_free(mast_dtas[i].gpu);
 			mast_dtas[i].gpu = -1;
-			gpio_free(gpio);
 		}
 		if (mast_dtas[i].add) {
 			w1_remove_master_device(&mast_dtas[i].master);
@@ -374,14 +452,17 @@ int init_module(void)
 			goto finish;
 		}
 
-		if (mdt.od && (!GPIO_VALID(mdt.gpu) && mdt.bpu)) {
-			printk(KERN_ERR LOG_PREF
-				"Can't enable data wire strong pull-up "
-				"bit-banging for an open-drain gpio; "
-				"m%d <%s>\n", i+1, marg);
+		if (mdt.od) {
+			if (!GPIO_VALID(mdt.gpu) && mdt.bpu) {
+				printk(KERN_ERR LOG_PREF
+					"Can't enable data wire strong pull-up "
+					"bit-banging for an open-drain gpio; "
+					"m%d <%s>\n", i+1, marg);
 
-			ret = -EINVAL;
-			goto finish;
+				ret = -EINVAL;
+				goto finish;
+			} else
+				mdt.bpu = 0;
 		}
 
 		if (!mdt.od && (GPIO_VALID(mdt.gpu) && mdt.bpu)) {
@@ -461,7 +542,7 @@ finish:
 	return ret;
 }
 
-MODULE_VERSION("1.1");
+MODULE_VERSION("1.2");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Command line configured gpio w1 bus master driver");
 MODULE_AUTHOR("Piotr Stolarz <pstolarz@o2.pl>");
