@@ -41,6 +41,29 @@
 # error Incorrect or undefined CONFIG_W1_MAST_MAX
 #endif
 
+#if defined(CONFIG_W1_BITBANG_PULLUP) && CONFIG_W1_BITBANG_PULLUP
+# define USE_W1_BITBANG_PULLUP
+#endif
+
+/*
+ * If CONFIG_COUNT_GPIO_REF is set, the module maintain GPIO access counter
+ * to avoid removing the driver and cleaning up its resources while GPIO access
+ * is still in progress. Albeit such protection is justified from the cleanup-run
+ * race point of view, its cost is rather high - each GPIO access operation is
+ * provided with extra atomic counter check.
+ * On the other hand, module cleaning up process is usually performed while
+ * circumstances the driver runs on are "clean and stable" and where GPIO access
+ * (derived from w1 operations) is rather uncommon to occur. For this reason it
+ * seems to be justified to sacrifice this extra anti-race condition avoidance
+ * cost on behalf of faster GPIO operations (which may be crucial for slower
+ * platforms).
+ * For this reason setting CONFIG_COUNT_GPIO_REF parameter is discouraged but
+ * the parameter may still be useful for some module cleanup related experiments.
+ */
+#if defined(CONFIG_COUNT_GPIO_REF) && CONFIG_COUNT_GPIO_REF
+# define USE_COUNT_GPIO_REF
+#endif
+
 /* Makefile auto-generated (CONFIG_W1_MAST_MAX dependant) */
 #include "gen-mast.h"
 
@@ -68,6 +91,7 @@ struct mast_dta
 static int n_mast;
 static struct mast_dta mast_dtas[CONFIG_W1_MAST_MAX];
 
+#ifdef USE_COUNT_GPIO_REF
 static atomic_t ref_cnt = ATOMIC_INIT(0);
 
 /*
@@ -128,6 +152,7 @@ static void cleanup_start(void)
 		/* cnt == 0 at this point */
 	} while (!atomic_try_cmpxchg_relaxed(&ref_cnt, &cnt, -1));
 }
+#endif /* USE_COUNT_GPIO_REF */
 
 /*
  * w1 bus master bit read callback.
@@ -139,10 +164,14 @@ static u8 w1_read_bit(void *data)
 	/* "normal state" of an open-drain medium is high */
 	u8 ret = 1;
 
+#ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
+#endif
 		ret = (gpio_get_value(mdt->gdt) ? 1 : 0);
+#ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
+#endif
 	return ret;
 }
 
@@ -153,14 +182,18 @@ static void w1_write_bit(void *data, u8 bit)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
+#ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
+#endif
 		if (bit) {
 			gpio_direction_input(mdt->gdt);
 		} else {
 			gpio_direction_output(mdt->gdt, 0);
 		}
+#ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
+#endif
 }
 
 /*
@@ -189,7 +222,22 @@ static void _w1_bitbang_pullup(void *data, u8 on)
 	}
 }
 
-#if !defined(CONFIG_W1_BITBANG_PULLUP) || !CONFIG_W1_BITBANG_PULLUP
+#ifdef USE_W1_BITBANG_PULLUP
+/*
+ * w1 bus master bitbang_pullup() callback.
+ */
+static void w1_bitbang_pullup(void *data, u8 on)
+{
+# ifdef USE_COUNT_GPIO_REF
+	if (inc_ref_cnt()) {
+# endif
+		_w1_bitbang_pullup(data, on);
+# ifdef USE_COUNT_GPIO_REF
+		dec_ref_cnt();
+	}
+# endif
+}
+#else
 /*
  * w1 bus master set_pullup() callback.
  */
@@ -197,7 +245,9 @@ static u8 w1_set_pullup(void *data, int pullup_duration)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
+# ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
+# endif
 		if (pullup_duration) {
 			mdt->pudur = pullup_duration;
 		} else {
@@ -206,22 +256,13 @@ static u8 w1_set_pullup(void *data, int pullup_duration)
 			_w1_bitbang_pullup(data, 0);
 			mdt->pudur = 0;
 		}
+# ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
+# endif
 	return 0;
 }
-#else
-/*
- * w1 bus master bitbang_pullup() callback.
- */
-static void w1_bitbang_pullup(void *data, u8 on)
-{
-	if (inc_ref_cnt()) {
-		_w1_bitbang_pullup(data, on);
-		dec_ref_cnt();
-	}
-}
-#endif
+#endif /* USE_W1_BITBANG_PULLUP */
 
 /*
  * Get a token for parse_mast_conf().
@@ -386,8 +427,10 @@ void cleanup_module(void)
 {
 	int i;
 
+#ifdef USE_COUNT_GPIO_REF
 	cleanup_start();
 	/* cleanup safely started (no more gpio access allowed hereafter) */
+#endif
 
 	for (i=0; i < n_mast; i++) {
 		if (GPIO_VALID(mast_dtas[i].gdt)) {
@@ -502,10 +545,10 @@ int init_module(void)
 
 		if (GPIO_VALID(mdt.gpu) || mdt.bpu)
 		{
-#if !defined(CONFIG_W1_BITBANG_PULLUP) || !CONFIG_W1_BITBANG_PULLUP
-			mdt.master.set_pullup = w1_set_pullup;
-#else
+#ifdef USE_W1_BITBANG_PULLUP
 			mdt.master.bitbang_pullup = w1_bitbang_pullup;
+#else
+			mdt.master.set_pullup = w1_set_pullup;
 #endif
 		}
 
@@ -542,7 +585,7 @@ finish:
 	return ret;
 }
 
-MODULE_VERSION("1.2");
+MODULE_VERSION("1.2.1");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Command line configured gpio w1 bus master driver");
 MODULE_AUTHOR("Piotr Stolarz <pstolarz@o2.pl>");
