@@ -2,7 +2,7 @@
  * w1-gpio-cl
  * Command line configured gpio w1 bus master driver
  *
- * Copyright (c) 2016,2018,2020 Piotr Stolarz <pstolarz@o2.pl>
+ * Copyright (c) 2016,2018,2020,2021 Piotr Stolarz <pstolarz@o2.pl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -46,19 +46,20 @@
 #endif
 
 /*
- * If CONFIG_COUNT_GPIO_REF is set, the module maintain GPIO access counter
- * to avoid removing the driver and cleaning up its resources while GPIO access
- * is still in progress. Albeit such protection is justified from the cleanup-run
- * race point of view, its cost is rather high - each GPIO access operation is
- * provided with extra atomic counter check.
+ * If CONFIG_COUNT_GPIO_REF is set, the module maintains bus-active-ref-counter
+ * to avoid removing the driver and cleaning up its resources while w1 bus
+ * activities are still in progress. Albeit such protection is justified from
+ * the cleanup-run race point of view, its cost is rather high - each GPIO
+ * access operation is provided with an extra atomic counter check.
  * On the other hand, module cleaning up process is usually performed while
- * circumstances the driver runs on are "clean and stable" and where GPIO access
- * (derived from w1 operations) is rather uncommon to occur. For this reason it
- * seems to be justified to sacrifice this extra anti-race condition avoidance
- * cost on behalf of faster GPIO operations (which may be crucial for slower
- * platforms).
- * For this reason setting CONFIG_COUNT_GPIO_REF parameter is discouraged but
- * the parameter may still be useful for some module cleanup related experiments.
+ * circumstances the driver runs on are "clean and stable", which means GPIO
+ * activities (derived from w1 operations on the bus) are rather uncommon to
+ * occur. For this reason it seems to be justified to sacrifice this extra
+ * anti-race condition avoidance cost on behalf of faster GPIO operations
+ * (which may be crucial for slower platforms).
+ * For this reason setting CONFIG_COUNT_GPIO_REF parameter is not recommended
+ * but the parameter may still be useful for some module cleanup related
+ * experiments.
  */
 #if defined(CONFIG_COUNT_GPIO_REF) && CONFIG_COUNT_GPIO_REF
 # define USE_COUNT_GPIO_REF
