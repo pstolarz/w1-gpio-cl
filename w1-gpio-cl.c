@@ -153,7 +153,11 @@ static void cleanup_start(void)
 		/* cnt == 0 at this point */
 	} while (!atomic_try_cmpxchg_relaxed(&ref_cnt, &cnt, -1));
 }
-#endif /* USE_COUNT_GPIO_REF */
+#else /* !USE_COUNT_GPIO_REF*/
+static inline bool inc_ref_cnt(void) { return true; }
+static inline void dec_ref_cnt(void) {}
+static inline void cleanup_start(void) {}
+#endif
 
 /*
  * w1 bus master bit read callback.
@@ -165,14 +169,10 @@ static u8 w1_read_bit(void *data)
 	/* "normal state" of an open-drain medium is high */
 	u8 ret = 1;
 
-#ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
-#endif
 		ret = (gpio_get_value(mdt->gdt) ? 1 : 0);
-#ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
-#endif
 	return ret;
 }
 
@@ -183,18 +183,14 @@ static void w1_write_bit(void *data, u8 bit)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-#ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
-#endif
 		if (bit) {
 			gpio_direction_input(mdt->gdt);
 		} else {
 			gpio_direction_output(mdt->gdt, 0);
 		}
-#ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
-#endif
 }
 
 /*
@@ -204,16 +200,14 @@ static void _w1_bitbang_pullup(void *data, u8 on)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-	if (GPIO_VALID(mdt->gpu))
-	{
+	if (GPIO_VALID(mdt->gpu)) {
 		/* bit-banging controlled via 'gpu' gpio */
 		if (on) {
 			gpio_set_value(mdt->gpu, (mdt->rev ? 1 : 0));
 		} else {
 			gpio_set_value(mdt->gpu, (mdt->rev ? 0 : 1));
 		}
-	} else
-	{
+	} else {
 		/* data wire bit-banging */
 		if (on) {
 			gpio_direction_output(mdt->gdt, 1);
@@ -229,16 +223,12 @@ static void _w1_bitbang_pullup(void *data, u8 on)
  */
 static void w1_bitbang_pullup(void *data, u8 on)
 {
-# ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
-# endif
 		_w1_bitbang_pullup(data, on);
-# ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
-# endif
 }
-#else
+#else /* !USE_W1_BITBANG_PULLUP */
 /*
  * w1 bus master set_pullup() callback.
  */
@@ -246,24 +236,20 @@ static u8 w1_set_pullup(void *data, int pullup_duration)
 {
 	struct mast_dta *mdt = (struct mast_dta*)data;
 
-# ifdef USE_COUNT_GPIO_REF
 	if (inc_ref_cnt()) {
-# endif
-		if (pullup_duration) {
+		if (pullup_duration)
 			mdt->pudur = pullup_duration;
-		} else {
+		else {
 			_w1_bitbang_pullup(data, 1);
 			msleep(mdt->pudur);
 			_w1_bitbang_pullup(data, 0);
 			mdt->pudur = 0;
 		}
-# ifdef USE_COUNT_GPIO_REF
 		dec_ref_cnt();
 	}
-# endif
 	return 0;
 }
-#endif /* USE_W1_BITBANG_PULLUP */
+#endif
 
 /*
  * Get a token for parse_mast_conf().
@@ -273,15 +259,18 @@ static size_t get_tkn(const char **p_str, const char **p_tkn)
 	char c;
 
 	/* cut leading spaces */
-	while ((c=**p_str, c==' ' || c=='\t')) (*p_str)++;
+	while ((c = **p_str, c == ' ' || c == '\t'))
+		(*p_str)++;
+
 	*p_tkn = *p_str;
 
-	for (; (c=**p_str, c && c!=' ' && c!='\t'); (*p_str)++) {
+	for (; (c = **p_str, c && c != ' ' && c != '\t'); (*p_str)++) {
 		if (!((c >= '0' && c <= '9') ||
-			  (c >= 'a' && c <= 'z') ||
-			  (c >= 'A' && c <= 'Z')))
-		{
-			if (*p_str == *p_tkn) (*p_str)++;
+			(c >= 'a' && c <= 'z') ||
+			(c >= 'A' && c <= 'Z'))) {
+
+			if (*p_str == *p_tkn)
+				(*p_str)++;
 			break;
 		}
 	}
@@ -316,87 +305,72 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 	for (ltkn = get_tkn(&arg, &tkn);
 		ltkn;
 		exts.gdt = exts.od = exts.bpu =
-			exts.gpu = exts.rev =exts.val = 0)
-	{
+			exts.gpu = exts.rev =exts.val = 0) {
+
 		/* param name */
-		if (!strncmp(tkn, "gdt", ltkn)) {
+		if (!strncmp(tkn, "gdt", ltkn))
 			exts.gdt = 1;
-		} else
-		if (!strncmp(tkn, "od", ltkn)) {
+		else if (!strncmp(tkn, "od", ltkn))
 			exts.od = 1;
-		} else
-		if (!strncmp(tkn, "bpu", ltkn)) {
+		else if (!strncmp(tkn, "bpu", ltkn))
 			exts.bpu = 1;
-		} else
-		if (!strncmp(tkn, "gpu", ltkn)) {
+		else if (!strncmp(tkn, "gpu", ltkn))
 			exts.gpu = 1;
-		} else
-		if (!strncmp(tkn, "rev", ltkn)) {
+		else if (!strncmp(tkn, "rev", ltkn))
 			exts.rev = 1;
-		} else {
+		else
 			/* unknown param */
 			return -EINVAL;
-		}
 
 		/* value existence */
 		ltkn = get_tkn(&arg, &tkn);
 		if (ltkn > 0) {
-			if (*tkn==':' || *tkn=='=') {
+			if (*tkn == ':' || *tkn == '=') {
 				ltkn = get_tkn(&arg, &tkn);
-				if (ltkn) exts.val = 1;
+				if (ltkn)
+					exts.val = 1;
+			} else if (*tkn == ',' || *tkn == ';') {
+				ltkn = get_tkn(&arg, &tkn);
 			} else
-			if (*tkn==',' || *tkn==';') {
-				ltkn = get_tkn(&arg, &tkn);
-			} else {
 				/* malformed */
 				return -EINVAL;
-			}
 		}
 
 		/* value parsing */
 		if (exts.gdt || exts.gpu) {
-			if (exts.val)
-			{
+			if (exts.val) {
 				/* integer */
-				for (val=0; tkn<arg; tkn++) {
-					if (*tkn>='0' && *tkn<='9') {
-						val = val*10 + *tkn-'0';
-					} else {
+				for (val = 0; tkn < arg; tkn++) {
+					if (*tkn >= '0' && *tkn <= '9')
+						val = 10 * val + *tkn - '0';
+					else
 						/* parsing error */
 						return -EINVAL;
-					}
 				}
 
 				if (exts.gdt)
 					mdt->gdt = val;
 				else
 					mdt->gpu = val;
-			} else {
+			} else
 				/* value is required */
 				return -EINVAL;
-			}
 		} else {
 			/* od, bpu, rev */
-			if (exts.val)
-			{
+			if (exts.val) {
 				/* bool */
-				if (tkn-arg==1 && (*tkn=='1' ||
-					*tkn=='y' || *tkn=='Y'))
-				{
+				if (tkn-arg == 1 && (*tkn == '1' ||
+					*tkn == 'y' || *tkn == 'Y'))
 					val = 1;
-				} else
-				if (tkn-arg==1 && (*tkn=='0' ||
-					*tkn=='n' || *tkn=='N'))
-				{
+				else if (tkn-arg == 1 && (*tkn == '0' ||
+					*tkn == 'n' || *tkn == 'N'))
 					val = 0;
-				} else {
+				else
 					/* parsing error */
 					return -EINVAL;
-				}
-			} else {
+			} else
 				/* if no value is provided assume 1 */
 				val = 1;
-			}
 
 			if (exts.od)
 				mdt->od = val;
@@ -410,10 +384,10 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 		if (exts.val) {
 			ltkn = get_tkn(&arg, &tkn);
 			if (ltkn > 0) {
-				if (*tkn!=',' && *tkn!=';') {
+				if (*tkn != ',' && *tkn != ';')
 					/* malformed */
 					return -EINVAL;
-				}
+
 				ltkn = get_tkn(&arg, &tkn);
 			}
 		}
@@ -428,12 +402,10 @@ void cleanup_module(void)
 {
 	int i;
 
-#ifdef USE_COUNT_GPIO_REF
 	cleanup_start();
 	/* cleanup safely started (no more gpio access allowed hereafter) */
-#endif
 
-	for (i=0; i < n_mast; i++) {
+	for (i = 0; i < n_mast; i++) {
 		if (GPIO_VALID(mast_dtas[i].gdt)) {
 			gpio_free(mast_dtas[i].gdt);
 			mast_dtas[i].gdt = -1;
@@ -456,7 +428,7 @@ void cleanup_module(void)
  */
 int init_module(void)
 {
-	int i, ret=0, res;
+	int i, res, ret = 0;
 	struct mast_dta mdt;
 	const char *marg;
 
@@ -469,8 +441,9 @@ int init_module(void)
 	mdt.master.read_bit = w1_read_bit;
 	mdt.master.write_bit = w1_write_bit;
 
-	for (i=0; i<CONFIG_W1_MAST_MAX; i++) {
-		if (!(marg = get_mast_arg(i))) continue;
+	for (i = 0; i < CONFIG_W1_MAST_MAX; i++) {
+		if (!(marg = get_mast_arg(i)))
+			continue;
 
 		if ((ret = parse_mast_conf(marg, &mdt)) != 0) {
 			printk(KERN_ERR LOG_PREF
@@ -521,31 +494,32 @@ int init_module(void)
 
 		if ((ret = gpio_request_one(mdt.gdt,
 			GPIOF_IN | (mdt.od ? GPIOF_OPEN_DRAIN : 0),
-			MODULE_NAME)) != 0)
-		{
+			MODULE_NAME)) != 0) {
+
 			printk(KERN_ERR LOG_PREF
 				"%d gpio request error: %d; m%d <%s>",
 				mdt.gdt, ret, i+1, marg);
+
 			goto finish;
 		}
 
 		if (GPIO_VALID(mdt.gpu) &&
 			(ret = gpio_request_one(mdt.gpu,
 				(mdt.rev ?
-					 GPIOF_OUT_INIT_LOW :
-					 GPIOF_OUT_INIT_HIGH),
-				MODULE_NAME)) != 0)
-		{
+					GPIOF_OUT_INIT_LOW :
+					GPIOF_OUT_INIT_HIGH),
+				MODULE_NAME)) != 0) {
+
 			printk(KERN_ERR LOG_PREF
 				"%d gpio request error: %d; m%d <%s>",
 				mdt.gpu, ret, i+1, marg);
+
 			goto finish;
 		}
 
 		mdt.master.data = &mast_dtas[n_mast];
 
-		if (GPIO_VALID(mdt.gpu) || mdt.bpu)
-		{
+		if (GPIO_VALID(mdt.gpu) || mdt.bpu) {
 #ifdef USE_W1_BITBANG_PULLUP
 			mdt.master.bitbang_pullup = w1_bitbang_pullup;
 #else
@@ -573,7 +547,7 @@ int init_module(void)
 	 * are only printk'ed.
 	 * On the other hand, failure here is rather uncommon.
 	 */
-	for (i=0; i < n_mast; i++) {
+	for (i = 0; i < n_mast; i++) {
 		if ((res = w1_add_master_device(&mast_dtas[i].master)) != 0) {
 			printk(KERN_ERR LOG_PREF
 				"w1_add_master_device error: %d", res);
@@ -582,7 +556,9 @@ int init_module(void)
 	}
 
 finish:
-	if (ret) cleanup_module();
+	if (ret)
+		cleanup_module();
+
 	return ret;
 }
 
