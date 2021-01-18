@@ -9,13 +9,13 @@ usual 1-wire support via the `wire` module). Moreover, there is possible
 coexistence between `w1-gpio` and `w1-gpio-cl`, provided no GPIOs conflict
 exists.
 
-Module configuration
+Module Configuration
 --------------------
 
 `w1-gpio-cl` is fully configured via its command line parameters while loading
 the driver. The configuration allows to launch many 1-wire bus masters
-controlling different GPIO pins. For parasite powering support, there is
-possible to choose a type of the strong pull-up to be used.
+controlling different GPIO pins. For parasite powering support, it is
+possible to choose the type of the strong pull-up to be used.
 
 General configuration syntax is:
 
@@ -64,7 +64,7 @@ Each of bus master configurations consist of set of parameters listed below:
   logic is reversed for the strong pull-up activation: GPIO in the high state
   if the strong pull-up is active, low state - otherwise.
 
-Example of usage
+Example of Usage
 ----------------
 
 ![Example](schema/example.png)
@@ -83,7 +83,7 @@ In this example, there have been configured three bus masters:
 
 NOTE: GPIO1, GPIO2, GPIO3 are numbers specifying actual GPIO pins.
 
-Compilation and loading
+Compilation and Loading
 -----------------------
 
 **Prerequisites**
