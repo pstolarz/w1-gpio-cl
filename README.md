@@ -18,8 +18,9 @@ controlling different GPIO pins. For parasite powering support, it is
 possible to choose the type of the strong pull-up to be used.
 
 General configuration syntax is:
-
-    modprobe w1-gpio-cl m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
+```
+modprobe w1-gpio-cl m1="gdt:num[,od][,bpu|gpu:num[,rev]]" [m2="..." ...]
+```
 
 NOTE: `:` and `,` syntax tokens may be replaced by `=` and `;` respectively,
 so `m1="gdt:4,od"` is equivalent to `m1="gdt:4;od"`, `m1="gdt=4,od"` or
@@ -55,7 +56,7 @@ Each of bus master configurations consist of set of parameters listed below:
 
   ![External GPIO strong pull-up](schema/gpu.png)
 
-  NOTE: In place of the MOSFET there is possible to use a PNP bipolar transistor
+  NOTE: In place of the MOSFET it's possible to use a PNP bipolar transistor
   with its emitter connected to `Vcc`, collector to the data wire and base to
   the controlling GPIO (`gpu`). If needed base-collector current reducing resistor
   shall be placed between the transistor's base and `gpu` pin.
@@ -86,49 +87,72 @@ NOTE: GPIO1, GPIO2, GPIO3 are numbers specifying actual GPIO pins.
 Compilation and Loading
 -----------------------
 
+The driver module may be compiled directly on the target machine or
+cross-compiled and the result to be copied into the target machine.
+If you are not familiar with the Linux kernel building process please refer to
+[this link](https://www.raspberrypi.org/documentation/linux/kernel/building.md)
+first. It provides good introduction to the topic of kernel
+compilation/cross-compilation for Raspberry Pi boards.
+
 **Prerequisites**
 
-* Standard Linux kernel building toolset: `gcc`, GNU Make, `bc` etc.
-  For Debian family systems required packages may be installed by:
+* Building tool-set.
 
-      sudo apt-get install build-essential bc
+  For compilation on the target machine, standard Linux kernel compilation
+  tool-set may be installed by (for Debian based systems):
+  ```
+  sudo apt-get install build-essential bc
+  ```
+
+  For cross-compilation appropriate target system tool-chain need to be
+  installed on the compiling machine.
 
 * Kernel headers and `kbuild` scripts corresponding to the target kernel.
 
-  Provided you are compiling the module for the host machine the required
-  headers may be installed by (Debian family OSes):
+  For compilation on the target machine the required headers may be installed
+  by (for Debian based systems):
+  ```
+  sudo apt-get install linux-headers-KERNEL_RELEASE
+  ```
+  where `KERNEL_RELEASE` corresponds to the kernel release version on the target
+  (to be checked by `uname -r`). Therefore (in most cases) the following command
+  shall install appropriate headers on the target machine:
+  ```
+  sudo apt-get install linux-headers-`uname -r`
+  ```
 
-      sudo apt-get install linux-headers-`uname -r`
+  For cross-compilation it's recommended to use Linux kernel sources
+  corresponding to the kernel version installed on the target machine.
+  The kernel sources need to be prepared via proper configuration and
+  `modules_prepare` as follows (launched from the kernel sources directory
+  on the compiling machine):
+  ```
+  ARCH=... CROSS_COMPILE=... make CONFIG_TARGET modules_prepare
+  ```
+  where `CONFIG_TARGET` is a specific kernel target configuration (e.g. for
+  Raspberry Pi boards the configuration shall be set to `bcmrpi_defconfig`,
+  `bcm2709_defconfig` or `bcm2711_defconfig` depending on the platform version).
+  `ARCH` and `CROSS_COMPILE` are required to indicate target architecture and
+  cross-compiling tool-chain.
 
-  There is also possible to indicate a target kernel source tree by setting
-  `KERNEL_SRC` as the source tree directory for the project `Makefile` (see
-  below). The source tree need to be prepared via proper configuration and
-  `modules_prepare` as follows (launched from the kernel source tree directory):
-
-      make CONFIG_TARGET
-      make modules_prepare
-
-  where *CONFIG_TARGET* is a specific configuration target (e.g. for Raspberry
-  Pi boards the configuration shall be set to `bcmrpi_defconfig`, `bcm2709_defconfig`
-  or `bcm2711_defconfig` depending on the platform version).
-
-  This approach is especially useful for the module cross-compilation, in which
-  case there is also a need to set `ARCH` and `CROSS_COMPILE` to their proper
-  values. Good explanation of kernel cross-compilation (for Raspberry Pi boards)
-  is [here](https://www.raspberrypi.org/documentation/linux/kernel/building.md).
+  NOTE: It's also possible to use kernel sources while compiling on the target
+  machine. In this case there is no need to set `ARCH` and `CROSS_COMPILE`,
+  since the local tool-set is used for the compilation.
 
 **Compilation**
 
-General compilation command syntax is as follows (launched from the project
-directory):
-
-    [KERNEL_SRC=...] [ARCH=...] [CROSS_COMPILE=...] [CONFIG_W1_MAST_MAX=...] make
+General compilation command syntax is as follows (launched from the `w1-gpio-cl`
+project directory):
+```
+[KERNEL_SRC=...] [ARCH=...] [CROSS_COMPILE=...] [CONFIG_W1_MAST_MAX=...] make
+```
 
 The result is `w1-gpio-cl.ko` driver module located in the project directory.
 All compilation definitions (`KERNEL_SRC`, `ARCH`, ...) are optional, with the
 following meaning:
 
-* `KERNEL_SRC`: specifies kernel source tree directory (see above).
+* `KERNEL_SRC`: specifies kernel sources directory in case they are used
+  instead of the pre-installed kernel headers (see above).
 
 * `ARCH`, `CROSS_COMPILE`: are used for module cross-compilation exactly as
   for the Linux kernel.
@@ -138,24 +162,25 @@ following meaning:
 
 **Installation**
 
-If the module was compiled on the destination machine there is possible to
-install it into the modules destination directory by:
-
-    sudo make install
-
+If the module was compiled on the target machine it's possible to install it
+into the destination directory by:
+```
+sudo make install
+```
 and uninstall by:
-
-    sudo make uninstall
+```
+sudo make uninstall
+```
 
 If the module was cross-compiled, copy `w1-gpio-cl.ko` module into its destination
 location on the target machine (`/lib/modules/KERNEL_RELEASE/kernel/drivers/w1/masters`)
-and remake the kernel modules dependencies by `depmod`.
+and remake the kernel modules dependencies by `sudo depmod`.
 
 **Loading**
-
-    sudo modprobe w1-gpio-cl MODULE_CONFIG
-
-where the *MODULE_CONFIG* part specifies 1-wire bus master(s) configuration as
+```
+sudo modprobe w1-gpio-cl MODULE_CONFIG
+```
+where the `MODULE_CONFIG` specifies 1-wire bus master(s) configuration as
 described above.
 
 If you need to load the module automatically update `/etc/modules` appropriately.
