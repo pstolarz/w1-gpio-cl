@@ -101,7 +101,7 @@ compilation/cross-compilation for Raspberry Pi boards.
   For compilation on the target machine, standard Linux kernel compilation
   tool-set may be installed by (for Debian based systems):
   ```
-  sudo apt-get install build-essential bc
+  sudo apt-get install build-essential bc flex bison libssl-dev
   ```
 
   For cross-compilation appropriate target system tool-chain need to be
