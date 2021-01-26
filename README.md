@@ -98,19 +98,23 @@ compilation/cross-compilation for Raspberry Pi boards.
 
 * Building tool-set.
 
-  For compilation on the target machine, standard Linux kernel compilation
-  tool-set may be installed by (for Debian based systems):
+  For compilation on the target machine Linux kernel building tools may be
+  installed by (for Debian based systems):
   ```
-  sudo apt-get install build-essential bc flex bison libssl-dev
+  sudo apt-get install build-essential bc bison flex libssl-dev
   ```
 
   For cross-compilation appropriate target system tool-chain need to be
-  installed on the compiling machine.
+  installed on the compiling machine (e.g. package `crossbuild-essential-armhf`
+  for 32-bit or `crossbuild-essential-arm64` for 64-bit ARM). Remaining tools
+  to be installed on the compiling machine:
+  ```
+  sudo apt-get install make bc bison flex libssl-dev
+  ```
 
 * Kernel headers and `kbuild` scripts corresponding to the target kernel.
 
-  For compilation on the target machine the required headers may be installed
-  by (for Debian based systems):
+  For compilation on the target machine the required headers may be installed by:
   ```
   sudo apt-get install linux-headers-KERNEL_RELEASE
   ```
