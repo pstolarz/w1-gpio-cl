@@ -98,50 +98,62 @@ compilation/cross-compilation for Raspberry Pi boards.
 
 * Building tool-set.
 
-  For compilation on the target machine Linux kernel building tools may be
-  installed by (for Debian based systems):
-  ```
-  sudo apt-get install build-essential bc bison flex libssl-dev
-  ```
+  * For compilation on the target machine Linux kernel building tools may be
+    installed by (for Debian based systems):
+    ```
+    sudo apt-get install build-essential bc bison flex libssl-dev
+    ```
 
-  For cross-compilation appropriate target system tool-chain need to be
-  installed on the compiling machine (e.g. package `crossbuild-essential-armhf`
-  for 32-bit or `crossbuild-essential-arm64` for 64-bit ARM). Remaining tools
-  to be installed on the compiling machine:
-  ```
-  sudo apt-get install make bc bison flex libssl-dev
-  ```
+  * For cross-compilation appropriate target system tool-chain need to be
+    installed on the compiling machine (e.g. package `crossbuild-essential-armhf`
+    for 32-bit or `crossbuild-essential-arm64` for 64-bit ARM). Remaining tools
+    to be installed on the compiling machine:
+    ```
+    sudo apt-get install make bc bison flex libssl-dev
+    ```
 
 * Kernel headers and `kbuild` scripts corresponding to the target kernel.
 
-  For compilation on the target machine the required headers may be installed by:
-  ```
-  sudo apt-get install linux-headers-KERNEL_RELEASE
-  ```
-  where `KERNEL_RELEASE` corresponds to the kernel release version on the target
-  (to be checked by `uname -r`). Therefore (in most cases) the following command
-  shall install appropriate headers on the target machine:
-  ```
-  sudo apt-get install linux-headers-`uname -r`
-  ```
+  * For compilation on the target machine the required headers may be installed
+    by:
+    ```
+    sudo apt-get install linux-headers-KERNEL_RELEASE
+    ```
+    where `KERNEL_RELEASE` corresponds to the kernel release version on the
+    target (to be checked by `uname -r`). In case the package repository
+    contains kernel headers corresponding to the current kernel image the
+    following command will install appropriate headers on the target machine:
+    ```
+    sudo apt-get install linux-headers-`uname -r`
+    ```
+    In case the target's system package repository doesn't contain kernel
+    headers package in a required version (usually the case for Raspberry Pi
+    Raspbian OS) there is a need to use kernel sources as described in the
+    subsequent point.
 
-  For cross-compilation it's recommended to use Linux kernel sources
-  corresponding to the kernel version installed on the target machine.
-  The kernel sources need to be prepared via proper configuration and
-  `modules_prepare` as follows (launched from the kernel sources directory
-  on the compiling machine):
-  ```
-  ARCH=... CROSS_COMPILE=... make CONFIG_TARGET modules_prepare
-  ```
-  where `CONFIG_TARGET` is a specific kernel target configuration (e.g. for
-  Raspberry Pi boards the configuration shall be set to `bcmrpi_defconfig`,
-  `bcm2709_defconfig` or `bcm2711_defconfig` depending on the platform version).
-  `ARCH` and `CROSS_COMPILE` are required to indicate target architecture and
-  cross-compiling tool-chain.
+  * For cross-compilation it's recommended to use Linux kernel sources
+    corresponding to the kernel version installed on the target machine.
+    The kernel sources need to be prepared via proper configuration and
+    `modules_prepare` as follows (launched from the kernel sources directory
+    on the compiling machine):
+    ```
+    ARCH=... CROSS_COMPILE=... make CONFIG_TARGET modules_prepare
+    ```
+    where `CONFIG_TARGET` is a specific kernel target configuration (e.g. for
+    Raspberry Pi boards the configuration shall be set to `bcmrpi_defconfig`,
+    `bcm2709_defconfig`, `bcm2711_defconfig` or `bcmrpi3_defconfig` depending
+    on the platform version). `ARCH` and `CROSS_COMPILE` are required to
+    indicate target architecture and cross-compiling tool-chain.
 
-  NOTE: It's also possible to use kernel sources while compiling on the target
-  machine. In this case there is no need to set `ARCH` and `CROSS_COMPILE`,
-  since the local tool-set is used for the compilation.
+    NOTE 1: When using kernel sources while compiling on the target machine,
+    there is no need to set `ARCH` and `CROSS_COMPILE`, since the local tool-set
+    is used for compilation.
+
+    NOTE 2: When compiling for Raspberry Pi,
+    [`search_kernel_commit.sh`](https://github.com/pstolarz/rpi-tools/blob/master/search_kernel_commit.sh)
+    script may be used to find commit on the official
+    [RPi kernel repository](https://github.com/raspberrypi/linux)
+    for target's kernel version.
 
 **Compilation**
 
