@@ -69,27 +69,15 @@ gen-mast: w1-headers
 
 w1-headers:
 	@if [ ! -L w1 ]; then \
-	  if [ -f ${KERN_SRC_DIR}/drivers/w1/w1_int.h ]; then \
-	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
-	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
-	  elif [ -f ${KERN_SRC_DIR}/include/linux/w1.h ]; then \
+	  if [ -f ${KERN_SRC_DIR}/include/linux/w1.h ]; then \
 	    ln -s ${KERN_SRC_DIR}/include/linux w1; \
 	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/include/linux"; \
+	  elif [ -f ${KERN_SRC_DIR}/drivers/w1/w1_int.h ]; then \
+	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
+	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
 	  else \
-	    if [ "${KERNEL_SRC}x" = "x" ]; then \
-	      ln -s w1-internal w1; \
-	      echo "NOTE: w1 -> w1-internal"; \
-	      echo "WARNING: The compiled module needs w1 set of headers, \
-which have not been detected on this platform. The compilation process will \
-use headers which are part of this source bundle (located in ./w1-internal \
-directory). Linux kernel API is not persistent across versions, so it is \
-STRONGLY recommended to set ./w1 symbolic link to a proper w1 header files \
-directory of the target kernel sources."; \
-	      read -p "Press ENTER to continue..." NULL; \
-	    else \
-	      echo "ERROR: w1 sources not found in ${KERNEL_SRC}"; \
-	      exit 1; \
-	    fi; \
+	    echo "ERROR: w1 headers not found in ${KERN_SRC_DIR}"; \
+	    exit 1; \
 	  fi; \
 	else \
 	  echo "NOTE: ./w1 symlink is already set and will not be updated. \
