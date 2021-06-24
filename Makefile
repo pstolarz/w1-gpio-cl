@@ -86,7 +86,7 @@ kernel sources examination."; \
 	fi;
 
 install:
-	cp $(obj-m:.o=.ko) /lib/modules/`uname -r`/kernel/drivers/w1/masters
+	install -m644 $(obj-m:.o=.ko) /lib/modules/`uname -r`/kernel/drivers/w1/masters
 	depmod
 
 uninstall:

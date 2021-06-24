@@ -199,7 +199,28 @@ sudo modprobe w1-gpio-cl MODULE_CONFIG
 where the `MODULE_CONFIG` specifies 1-wire bus master(s) configuration as
 described above.
 
-If you need to load the module automatically update `/etc/modules` appropriately.
+If you need to load the module automatically create the following files:
+* `/etc/modules-load.d/w1-gpio-cl.conf` with content:
+```
+w1-gpio-cl
+```
+* `/etc/modprobe.d/w1-gpio-cl.conf` with content:
+```
+options w1-gpio-cl MODULE_CONFIG
+```
+where the `MODULE_CONFIG` specifies 1-wire bus master(s) configuration.
+
+**DKMS**
+
+The module may be installed as part of [DKMS](https://en.wikipedia.org/wiki/Dynamic_Kernel_Module_Support)
+system. To install `w1-gpio-cl` as DKMS module launch the following commands
+from the module source directory:
+```
+sudo dkms add .
+sudo dkms install w1-gpio-cl/MODULE_VER
+```
+where `MODULE_VER` denotes module version (e.g. `1.2.1`). From now any kernel
+updates on the target machine will precompile `w1-gpio-cl` module accordingly.
 
 License
 -------
