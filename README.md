@@ -58,8 +58,8 @@ Each of bus master configurations consist of set of parameters listed below:
 
   NOTE: In place of the MOSFET it's possible to use a PNP bipolar transistor
   with its emitter connected to `Vcc`, collector to the data wire and base to
-  the controlling GPIO (`gpu`). If needed base-collector current reducing resistor
-  shall be placed between the transistor's base and `gpu` pin.
+  the controlling GPIO (`gpu`). Current reducing resistor shall be placed between
+  the transistor's base and `gpu` pin.
 
 * `rev` - if specified and the `gpu` parameter is provided, the `gpu` GPIO
   logic is reversed for the strong pull-up activation: GPIO in the high state
