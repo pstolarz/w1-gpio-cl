@@ -20,6 +20,10 @@ distclean: clean
 	rm -f w1 kernel-source kernel-build tags
 
 gen-mast: w1-headers
+	@if [ ${CONFIG_W1_MAST_MAX} -lt 1 -o ${CONFIG_W1_MAST_MAX} -gt 100 ]; then \
+	  echo "ERROR: Invalid CONFIG_W1_MAST_MAX"; \
+	  exit 1; \
+	fi
 	@for i in `seq 1 ${CONFIG_W1_MAST_MAX}`; \
 	do \
 	  case $$i in \
@@ -34,17 +38,19 @@ gen-mast: w1-headers
 	      echo "#include \"w1/w1.h\"" >>$@.h; \
 	    fi; \
 	    echo >>$@.h; \
-	   if [ `grep -c bitbang_pullup w1/w1.h` -gt 0 ]; then \
-	     echo "NOTE: bitbang_pullup() supported as a pullup callback"; \
-	     echo "#ifndef CONFIG_W1_BITBANG_PULLUP" >>$@.h; \
-	     echo "# define CONFIG_W1_BITBANG_PULLUP 1" >>$@.h; \
-	     echo "#endif" >>$@.h; \
-	     echo >>$@.h; \
-	   fi; \
+	    if [ `grep -c bitbang_pullup w1/w1.h` -gt 0 ]; then \
+	      echo "NOTE: bitbang_pullup() supported as a pullup callback"; \
+	      echo "#ifndef CONFIG_W1_BITBANG_PULLUP" >>$@.h; \
+	      echo "# define CONFIG_W1_BITBANG_PULLUP 1" >>$@.h; \
+	      echo "#endif" >>$@.h; \
+	      echo >>$@.h; \
+	    fi; \
 	    pf="st";; \
-	  2) \
+	  21|31|41|51|61|71|81|91) \
+	    pf="st";; \
+	  2|22|32|42|52|62|72|82|92) \
 	    pf="nd";; \
-	  3) \
+	  3|23|33|43|53|63|73|83|93) \
 	    pf="rd";; \
 	  *) \
 	    pf="th";; \

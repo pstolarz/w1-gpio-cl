@@ -2,7 +2,7 @@
  * w1-gpio-cl
  * Command line configured gpio w1 bus master driver
  *
- * Copyright (c) 2016,2018,2020,2021 Piotr Stolarz <pstolarz@o2.pl>
+ * Copyright (c) 2016,2018,2020-2022 Piotr Stolarz <pstolarz@o2.pl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -37,7 +37,8 @@
 # error Kernel need to be configured with W1 support
 #endif
 
-#if !defined(CONFIG_W1_MAST_MAX) || CONFIG_W1_MAST_MAX <= 0
+#if !defined(CONFIG_W1_MAST_MAX) || \
+	CONFIG_W1_MAST_MAX < 1 || CONFIG_W1_MAST_MAX > 100
 # error Incorrect or undefined CONFIG_W1_MAST_MAX
 #endif
 
