@@ -81,8 +81,14 @@ w1-headers:
 	  elif [ -f ${KERN_SRC_DIR}/drivers/w1/w1_int.h ]; then \
 	    ln -s ${KERN_SRC_DIR}/drivers/w1 w1; \
 	    echo "NOTE: w1 -> ${KERN_SRC_DIR}/drivers/w1"; \
+	  elif [ -f ${KERN_BLD_DIR}/include/linux/w1.h ]; then \
+	    ln -s ${KERN_BLD_DIR}/include/linux w1; \
+	    echo "NOTE: w1 -> ${KERN_BLD_DIR}/include/linux"; \
+	  elif [ -f ${KERN_BLD_DIR}/drivers/w1/w1_int.h ]; then \
+	    ln -s ${KERN_BLD_DIR}/drivers/w1 w1; \
+	    echo "NOTE: w1 -> ${KERN_BLD_DIR}/drivers/w1"; \
 	  else \
-	    echo "ERROR: w1 headers not found in ${KERN_SRC_DIR}"; \
+	    echo "ERROR: w1 headers not found"; \
 	    exit 1; \
 	  fi; \
 	else \
