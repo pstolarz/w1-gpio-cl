@@ -40,6 +40,7 @@ Each of bus master configurations consist of set of parameters listed below:
   1-wire bus). This parameter is obligatory for each bus master specification.
 
 * `od` - if specified, the data wire GPIO (`gdt`) is of an open drain type.
+  Support for this parameter is absent for kernels >= v6.5.
 
 * `bpu` - if specified, parasite powering is enabled via the data wire strong
   pull-up bit-banging. This type of strong pull-up is possible only for non
