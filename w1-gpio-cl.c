@@ -46,6 +46,11 @@
 # define USE_W1_BITBANG_PULLUP
 #endif
 
+/* GPIOF_OPEN_DRAIN flag is removed for kernels >= v6.5 */
+#ifndef GPIOF_OPEN_DRAIN
+# define GPIOF_OPEN_DRAIN 0
+#endif
+
 /*
  * If CONFIG_COUNT_GPIO_REF is set, the module maintains bus-active-ref-counter
  * to avoid removing the driver and cleaning up its resources while w1 bus
@@ -311,8 +316,10 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 		/* param name */
 		if (!strncmp(tkn, "gdt", ltkn))
 			exts.gdt = 1;
+#if GPIOF_OPEN_DRAIN
 		else if (!strncmp(tkn, "od", ltkn))
 			exts.od = 1;
+#endif
 		else if (!strncmp(tkn, "bpu", ltkn))
 			exts.bpu = 1;
 		else if (!strncmp(tkn, "gpu", ltkn))
