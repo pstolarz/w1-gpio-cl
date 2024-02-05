@@ -2,7 +2,7 @@
  * w1-gpio-cl
  * Command line configured gpio w1 bus master driver
  *
- * Copyright (c) 2016,2018,2020-2022 Piotr Stolarz <pstolarz@o2.pl>
+ * Copyright (c) 2016,2018,2020-2022,2024 Piotr Stolarz <pstolarz@o2.pl>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -311,7 +311,7 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 	for (ltkn = get_tkn(&arg, &tkn);
 		ltkn;
 		exts.gdt = exts.od = exts.bpu =
-			exts.gpu = exts.rev =exts.val = 0) {
+			exts.gpu = exts.rev = exts.val = 0) {
 
 		/* param name */
 		if (!strncmp(tkn, "gdt", ltkn))
@@ -455,7 +455,7 @@ int init_module(void)
 
 		if ((ret = parse_mast_conf(marg, &mdt)) != 0) {
 			printk(KERN_ERR LOG_PREF
-				"Invalid arg format; m%d <%s>\n", i+1, marg);
+				"Invalid arg format; m%d <%s>\n", i + 1, marg);
 
 			goto finish;
 		}
@@ -463,7 +463,7 @@ int init_module(void)
 		if (!GPIO_VALID(mdt.gdt) || !gpio_is_valid(mdt.gdt)) {
 			printk(KERN_ERR LOG_PREF
 				"Invalid or not provided 'gdt' gpio;"
-				" m%d <%s>\n", i+1, marg);
+				" m%d <%s>\n", i + 1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -471,7 +471,7 @@ int init_module(void)
 
 		if (GPIO_VALID(mdt.gpu) && !gpio_is_valid(mdt.gpu)) {
 			printk(KERN_ERR LOG_PREF
-				"Invalid 'gpu' gpio; m%d <%s>\n", i+1, marg);
+				"Invalid 'gpu' gpio; m%d <%s>\n", i + 1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -482,7 +482,7 @@ int init_module(void)
 				printk(KERN_ERR LOG_PREF
 					"Can't enable data wire strong pull-up "
 					"bit-banging for an open-drain gpio; "
-					"m%d <%s>\n", i+1, marg);
+					"m%d <%s>\n", i + 1, marg);
 
 				ret = -EINVAL;
 				goto finish;
@@ -494,7 +494,7 @@ int init_module(void)
 			printk(KERN_ERR LOG_PREF
 				"Be specific if strong pull-up should be "
 				"enabled via the data wire bit-banging or an "
-				"external gpio; m%d <%s>", i+1, marg);
+				"external gpio; m%d <%s>", i + 1, marg);
 
 			ret = -EINVAL;
 			goto finish;
@@ -506,7 +506,7 @@ int init_module(void)
 
 			printk(KERN_ERR LOG_PREF
 				"%d gpio request error: %d; m%d <%s>",
-				mdt.gdt, ret, i+1, marg);
+				mdt.gdt, ret, i + 1, marg);
 
 			goto finish;
 		}
@@ -520,7 +520,7 @@ int init_module(void)
 
 			printk(KERN_ERR LOG_PREF
 				"%d gpio request error: %d; m%d <%s>",
-				mdt.gpu, ret, i+1, marg);
+				mdt.gpu, ret, i + 1, marg);
 
 			goto finish;
 		}
@@ -570,7 +570,7 @@ finish:
 	return ret;
 }
 
-MODULE_VERSION("1.2.1");
+MODULE_VERSION("1.2.2");
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Command line configured gpio w1 bus master driver");
 MODULE_AUTHOR("Piotr Stolarz <pstolarz@o2.pl>");
