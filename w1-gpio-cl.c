@@ -63,9 +63,8 @@
  * occur. For this reason it seems to be justified to sacrifice this extra
  * anti-race condition avoidance cost on behalf of faster GPIO operations
  * (which may be crucial for slower platforms).
- * For this reason setting CONFIG_COUNT_GPIO_REF parameter is not recommended
- * but the parameter may still be useful for some module cleanup related
- * experiments.
+ * For this reason setting CONFIG_COUNT_GPIO_REF is not recommended but it
+ * may still be useful for some module cleanup related experiments.
  */
 #if defined(CONFIG_COUNT_GPIO_REF) && CONFIG_COUNT_GPIO_REF
 # define USE_COUNT_GPIO_REF
@@ -285,7 +284,7 @@ static size_t get_tkn(const char **p_str, const char **p_tkn)
 
 /*
  * Parse w1 bus master conf argument and write a result under mast_dta struct.
- * If success 0 is returned. In case some parameter is absent in the conf,
+ * If success 0 is returned. In case some argument is absent in the conf,
  * default value is assumed.
  */
 static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
@@ -313,21 +312,26 @@ static int parse_mast_conf(const char *arg, struct mast_dta *mdt)
 		exts.gdt = exts.od = exts.bpu =
 			exts.gpu = exts.rev = exts.val = 0) {
 
-		/* param name */
+		/* argument name */
 		if (!strncmp(tkn, "gdt", ltkn))
 			exts.gdt = 1;
+		else if (!strncmp(tkn, "od", ltkn)) {
 #if GPIOF_OPEN_DRAIN
-		else if (!strncmp(tkn, "od", ltkn))
 			exts.od = 1;
+#else
+			printk(KERN_ERR LOG_PREF "'od' argument is not "
+				"supported for this version of kernel\n");
+			return -EINVAL;
 #endif
-		else if (!strncmp(tkn, "bpu", ltkn))
+		} else
+		if (!strncmp(tkn, "bpu", ltkn))
 			exts.bpu = 1;
 		else if (!strncmp(tkn, "gpu", ltkn))
 			exts.gpu = 1;
 		else if (!strncmp(tkn, "rev", ltkn))
 			exts.rev = 1;
 		else
-			/* unknown param */
+			/* unknown argument */
 			return -EINVAL;
 
 		/* value existence */
